@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>QuizBot Admin Panel</title>
+  <link rel="stylesheet" href="/css/style.css" />
+</head>
+<body>
+  <div id="login-screen" class="screen">
+    <div class="login-card">
+      <div class="logo">🤖</div>
+      <h1>QuizBot Admin</h1>
+      <p>Admin paneliga kirish uchun maxfiy kalitni kiriting</p>
+      <input type="password" id="secret-input" placeholder="Admin secret..." />
+      <button onclick="login()">Kirish</button>
+      <p id="login-error" class="error-text"></p>
+    </div>
+  </div>
+
+  <div id="app" class="screen hidden">
+    <nav class="sidebar">
+      <div class="logo-nav">🤖 QuizBot</div>
+      <ul>
+        <li><a href="#" onclick="showPage('dashboard')" id="nav-dashboard" class="active">📊 Dashboard</a></li>
+        <li><a href="#" onclick="showPage('create-quiz')" id="nav-create-quiz">➕ Test yaratish</a></li>
+        <li><a href="#" onclick="showPage('import')" id="nav-import">📂 CSV Import</a></li>
+        <li><a href="#" onclick="showPage('stats')" id="nav-stats">📈 Natijalar</a></li>
+      </ul>
+      <div class="sidebar-footer">
+        <button onclick="toggleTheme()" class="theme-toggle" id="theme-toggle-btn" title="Mavzu (kunduz/tun)">
+          <span class="tt-icon" id="tt-icon">🌙</span>
+          <span class="tt-label" id="tt-label">Tungi rejim</span>
+          <span class="tt-switch"></span>
+        </button>
+        <button onclick="logout()" class="btn-logout">Chiqish</button>
+      </div>
+    </nav>
+
+    <main class="content">
+      <!-- DASHBOARD -->
+      <div id="page-dashboard" class="page">
+        <h2>
+          📊 Dashboard
+          <span class="filter-result-count" id="quiz-count-label"></span>
+        </h2>
+        <div class="search-wrap">
+          <input type="text" id="quiz-search" class="search-input" placeholder="Test nomi bo'yicha izlash..." oninput="filterDashboardQuizzes()" />
+          <button class="filter-chip active" data-filter="all" onclick="setDashboardFilter('all')">Hammasi</button>
+          <button class="filter-chip" data-filter="active" onclick="setDashboardFilter('active')">🟢 Faol</button>
+          <button class="filter-chip" data-filter="inactive" onclick="setDashboardFilter('inactive')">🔴 Nofaol</button>
+          <select id="quiz-sort" class="filter-chip" onchange="filterDashboardQuizzes()" style="padding-right:32px" title="Saralash">
+            <option value="new">🆕 Yangidan</option>
+            <option value="old">📅 Eskidan</option>
+            <option value="title">🔤 A-Z</option>
+            <option value="most">📝 Ko'p savolli</option>
+          </select>
+        </div>
+        <div id="quiz-list" class="quiz-grid"></div>
+      </div>
+
+      <!-- CREATE QUIZ -->
+      <div id="page-create-quiz" class="page hidden">
+        <h2 id="create-quiz-title">➕ Yangi Test Yaratish</h2>
+        <div class="card">
+          <div class="form-group">
+            <label>Test nomi *</label>
+            <input type="text" id="quiz-title" placeholder="Masalan: Matematika testi" />
+          </div>
+          <div class="form-group">
+            <label>Tavsif</label>
+            <textarea id="quiz-desc" placeholder="Ixtiyoriy..."></textarea>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Vaqt limiti (soniya)</label>
+              <input type="number" id="quiz-time" value="30" min="5" max="300" />
+            </div>
+            <div class="form-group">
+              <label>Savollarni aralashtirish</label>
+              <select id="quiz-shuffle-q">
+                <option value="true">Ha</option>
+                <option value="false">Yo'q</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Javoblarni aralashtirish</label>
+              <select id="quiz-shuffle-a">
+                <option value="true">Ha</option>
+                <option value="false">Yo'q</option>
+              </select>
+            </div>
+          </div>
+          <div class="btn-row">
+            <button id="btn-save-quiz" onclick="saveQuiz()" class="btn-primary">✅ Test yaratish</button>
+            <button id="btn-new-quiz" onclick="newQuizForm()" class="btn-secondary hidden">➕ Yangi test</button>
+          </div>
+        </div>
+
+        <div id="questions-section" class="hidden">
+          <h3>📝 Savollar qo'shish</h3>
+          <div class="card">
+            <div class="form-group">
+              <label>Savol matni *</label>
+              <textarea id="q-text" placeholder="Savol matnini kiriting..."></textarea>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label>A variant *</label>
+                <input type="text" id="q-a" placeholder="A variant" />
+              </div>
+              <div class="form-group">
+                <label>B variant *</label>
+                <input type="text" id="q-b" placeholder="B variant" />
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label>C variant *</label>
+                <input type="text" id="q-c" placeholder="C variant" />
+              </div>
+              <div class="form-group">
+                <label>D variant *</label>
+                <input type="text" id="q-d" placeholder="D variant" />
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label>To'g'ri javob *</label>
+                <select id="q-correct">
+                  <option value="0">A</option>
+                  <option value="1">B</option>
+                  <option value="2">C</option>
+                  <option value="3">D</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>Izoh (ixtiyoriy)</label>
+                <input type="text" id="q-explain" placeholder="Nima uchun to'g'ri?" />
+              </div>
+            </div>
+            <button onclick="addQuestion()" class="btn-primary">➕ Savol qo'shish</button>
+          </div>
+
+          <div id="questions-preview" class="questions-list"></div>
+        </div>
+      </div>
+
+      <!-- IMPORT -->
+      <div id="page-import" class="page hidden">
+        <h2>📂 CSV Import</h2>
+        <div class="card">
+          <p>CSV fayl formati:</p>
+          <pre class="code-block">quiz_title,question,option_a,option_b,option_c,option_d,correct,explain
+"Matematika","2+2=?","3","4","5","6","B","Ikki sonni qo'shish"</pre>
+          <a href="/template.csv" download class="btn-secondary">⬇️ Shablon yuklab olish</a>
+        </div>
+
+        <div class="card">
+          <div class="upload-area" id="upload-area" onclick="document.getElementById('csv-file').click()">
+            <div class="upload-icon">📁</div>
+            <p>CSV faylni tanlang yoki bu yerga tashlang</p>
+            <input type="file" id="csv-file" accept=".csv" style="display:none" onchange="previewCSV()" />
+          </div>
+
+          <div id="preview-section" class="hidden">
+            <h3>📋 Ko'rib chiqish:</h3>
+            <div id="preview-content"></div>
+
+            <h3>⚙️ Import sozlamalari</h3>
+            <div class="card" style="margin:0">
+              <div class="form-group">
+                <label>📚 Test to'plami nomi <span style="color:var(--danger)">*</span></label>
+                <input type="text" id="import-title" title="Test to'plami nomi" placeholder="Masalan: Matematika 2026" />
+                <p style="font-size:11px;color:var(--text-muted);margin-top:4px">
+                  CSV ichida bir nechta nom bo'lsa ham, hammasi shu nom ostida birlashtiriladi
+                </p>
+              </div>
+              <div class="form-row">
+                <div class="form-group">
+                  <label>⏱ Har savolga vaqt (soniya) <span style="color:var(--danger)">*</span></label>
+                  <input type="number" id="import-time" value="30" min="5" max="300" />
+                </div>
+                <div class="form-group">
+                  <label>🔀 Savollarni aralashtirish</label>
+                  <select id="import-shuffle-q" title="Savollarni aralashtirish">
+                    <option value="true">Ha</option>
+                    <option value="false">Yo'q</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label>🎲 Javoblarni aralashtirish</label>
+                  <select id="import-shuffle-a" title="Javoblarni aralashtirish">
+                    <option value="true">Ha</option>
+                    <option value="false">Yo'q</option>
+                  </select>
+                </div>
+              </div>
+              <div id="import-existing-warn" class="modal-warning hidden" style="margin:0 0 12px">
+                <span id="import-existing-warn-text"></span>
+              </div>
+            </div>
+
+            <div class="btn-row">
+              <button onclick="doImportCSV()" class="btn-primary">✅ Import qilish</button>
+              <button onclick="clearPreview()" class="btn-secondary">❌ Bekor qilish</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- STATS -->
+      <div id="page-stats" class="page hidden">
+        <h2>📈 Natijalar</h2>
+        <div id="stats-quiz-select" class="card">
+          <label>Test tanlang:</label>
+          <select id="stats-quiz-id" onchange="loadStats()">
+            <option value="">— Tanlang —</option>
+          </select>
+        </div>
+        <div id="stats-content"></div>
+      </div>
+    </main>
+  </div>
+
+  <!-- MODAL -->
+  <div id="modal" class="modal hidden">
+    <div class="modal-content">
+      <div id="modal-icon"></div>
+      <h3 id="modal-title"></h3>
+      <div id="modal-body"></div>
+      <div class="btn-row">
+        <button id="modal-confirm" class="btn-primary">Ha</button>
+        <button onclick="closeModal()" class="btn-secondary">Bekor</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast hidden"></div>
+
+  <script src="/js/app.js"></script>
+</body>
+</html>

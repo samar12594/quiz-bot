@@ -1,0 +1,7 @@
+quiz_title,question,option_a,option_b,option_c,option_d,correct,explain
+"Matematika testi","2+2 nechaga teng?","3","4","5","6","B","Ikki sonni qo'shish"
+"Matematika testi","5*5 nechaga teng?","20","25","30","15","B",""
+"Matematika testi","10-3 nechaga teng?","5","6","7","8","C",""
+"Matematika testi","100 / 4 = ?","20","25","30","15","B","100 ni 4 ga bo'lsak 25 chiqadi"
+"Informatika testi","HTML ning to'liq nomi nima?","HyperText Markup Language","HighTech Modern Language","HyperText Modern Links","HyperText Machine Language","A","HTML - veb sahifalar tili"
+"Informatika testi","CSS nima uchun ishlatiladi?","Dasturlash uchun","Sahifani bezash uchun","Ma'lumotlar bazasi uchun","Server uchun","B",""

@@ -1,0 +1,1301 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1"/>
+<meta name="theme-color" content="#1a1033"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="apple-mobile-web-app-title" content="QuizBot"/>
+<link rel="manifest" href="/manifest.json"/>
+<title>QuizBot</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+:root{
+  --bg:#0f0e17;--card:#1a1033;--card2:#221844;
+  --accent:#7c3aed;--accent2:#a855f7;--accent-glow:rgba(124,58,237,0.35);
+  --success:#10b981;--success-bg:rgba(16,185,129,0.15);
+  --danger:#ef4444;--danger-bg:rgba(239,68,68,0.15);
+  --text:#f8f7ff;--text2:#9090b0;--border:rgba(255,255,255,0.08);
+  --header-bg:linear-gradient(to bottom,var(--bg),transparent);
+  --radius:16px;--radius-sm:10px;
+}
+[data-theme="light"]{
+  --bg:#f5f6fb;--card:#ffffff;--card2:#f0eef9;
+  --accent:#7c3aed;--accent2:#a855f7;--accent-glow:rgba(124,58,237,0.22);
+  --success:#059669;--success-bg:rgba(16,185,129,0.12);
+  --danger:#dc2626;--danger-bg:rgba(239,68,68,0.10);
+  --text:#1a1530;--text2:#6b6884;--border:rgba(20,15,50,0.08);
+  --header-bg:linear-gradient(to bottom,var(--bg),transparent);
+}
+html,body{height:100%;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;overflow:hidden;transition:background .25s ease,color .25s ease}
+#root{height:100%;position:relative;overflow:hidden}
+
+/* SCREENS */
+.screen{position:absolute;inset:0;display:flex;flex-direction:column;transform:translateX(100%);transition:transform .35s cubic-bezier(.4,0,.2,1);overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;background:var(--bg)}
+.screen.active{transform:translateX(0)}
+.screen.prev{transform:translateX(-30%)}
+
+/* HEADER */
+.hdr{display:flex;align-items:center;padding:56px 20px 16px;gap:12px;flex-shrink:0;background:var(--header-bg)}
+.hdr-back{width:38px;height:38px;border-radius:50%;border:none;background:var(--card2);color:var(--text);font-size:20px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.hdr h2{font-size:20px;font-weight:700;flex:1}
+.hdr-badge{background:var(--accent);color:white;font-size:12px;padding:4px 10px;border-radius:20px;font-weight:600}
+.hdr-icon{width:38px;height:38px;border-radius:50%;border:none;background:var(--card2);color:var(--text);font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:background .2s,transform .15s}
+.hdr-icon:active{transform:scale(.92)}
+.hdr-icon:hover{background:var(--accent-glow)}
+
+/* FILTER / SEARCH */
+.search-row{display:flex;gap:8px;margin-bottom:14px;align-items:center}
+.search-box{position:relative;flex:1}
+.search-box .search-inp{width:100%;background:var(--card2);border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:12px 14px 12px 38px;color:var(--text);font-size:14px;outline:none;transition:border-color .2s}
+.search-box .search-inp:focus{border-color:var(--accent)}
+.search-box .search-inp::placeholder{color:var(--text2)}
+.search-box::before{content:'🔍';position:absolute;left:12px;top:50%;transform:translateY(-50%);font-size:14px;opacity:.7;pointer-events:none}
+.search-box .clear-btn{position:absolute;right:8px;top:50%;transform:translateY(-50%);width:24px;height:24px;border-radius:50%;background:var(--card);border:none;color:var(--text2);cursor:pointer;display:none;align-items:center;justify-content:center;font-size:12px}
+.search-box.has-value .clear-btn{display:flex}
+.sort-select{background:var(--card2);border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:12px 30px 12px 12px;color:var(--text);font-size:13px;outline:none;cursor:pointer;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' fill='none'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%239090b0' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 10px center}
+.chip-row{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;overflow-x:auto;-webkit-overflow-scrolling:touch}
+.chip-row::-webkit-scrollbar{display:none}
+.chip{padding:7px 14px;border-radius:20px;background:var(--card2);color:var(--text2);border:1px solid var(--border);font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;transition:all .2s}
+.chip.active{background:var(--accent);color:white;border-color:var(--accent);box-shadow:0 2px 10px var(--accent-glow)}
+.filter-count{font-size:12px;color:var(--text2);margin-bottom:8px;display:block}
+
+/* CARDS */
+.pad{padding:0 20px 20px}
+.card{background:var(--card);border-radius:var(--radius);padding:20px;border:1px solid var(--border);margin-bottom:12px}
+.card-glow{box-shadow:0 0 24px var(--accent-glow)}
+
+/* INPUTS */
+.input-group{margin-bottom:16px}
+.input-group label{display:block;font-size:13px;color:var(--text2);margin-bottom:8px;font-weight:500}
+.inp{width:100%;background:var(--card2);border:2px solid var(--border);border-radius:var(--radius-sm);padding:14px 16px;color:var(--text);font-size:16px;outline:none;transition:border-color .2s}
+.inp:focus{border-color:var(--accent)}
+.inp::placeholder{color:var(--text2)}
+
+/* BUTTONS */
+.btn{width:100%;padding:16px;border:none;border-radius:var(--radius-sm);font-size:16px;font-weight:600;cursor:pointer;transition:all .15s;position:relative;overflow:hidden}
+.btn:active{transform:scale(.97)}
+.btn-primary{background:linear-gradient(135deg,var(--accent),var(--accent2));color:white;box-shadow:0 4px 20px var(--accent-glow)}
+.btn-secondary{background:var(--card2);color:var(--text);border:1px solid var(--border)}
+.btn-sm{padding:10px 18px;font-size:14px;width:auto;border-radius:8px}
+
+/* LOGIN SCREEN */
+#s-login{background:var(--bg);justify-content:center;align-items:center;padding:40px 28px;gap:0}
+.logo-wrap{text-align:center;margin-bottom:40px}
+.logo-wrap .emoji{font-size:72px;display:block;margin-bottom:12px;filter:drop-shadow(0 0 20px var(--accent))}
+.logo-wrap h1{font-size:28px;font-weight:800;background:linear-gradient(135deg,#fff,var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.logo-wrap p{color:var(--text2);margin-top:6px;font-size:14px}
+.login-form{width:100%;max-width:360px}
+
+/* HOME SCREEN */
+.user-banner{background:linear-gradient(135deg,var(--card),var(--card2));border-radius:var(--radius);padding:20px;margin-bottom:20px;border:1px solid var(--border);display:flex;align-items:center;gap:14px}
+.avatar{width:52px;height:52px;background:linear-gradient(135deg,var(--accent),var(--accent2));border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:700;flex-shrink:0}
+.user-info h3{font-size:17px;font-weight:700}
+.user-info p{color:var(--text2);font-size:13px;margin-top:2px}
+
+.section-title{font-size:13px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px}
+
+.quiz-item{background:var(--card);border-radius:var(--radius);padding:16px 18px;border:1px solid var(--border);display:flex;align-items:center;gap:14px;cursor:pointer;transition:all .2s;margin-bottom:10px;-webkit-user-select:none;user-select:none}
+.quiz-item:active{background:var(--card2);transform:scale(.98)}
+.quiz-item:hover{border-color:var(--accent);box-shadow:0 4px 16px var(--accent-glow)}
+[data-theme="light"] .quiz-item{box-shadow:0 1px 4px rgba(20,15,50,0.04)}
+[data-theme="light"] .quiz-item:hover{box-shadow:0 6px 20px rgba(124,58,237,0.18)}
+[data-theme="light"] .card,
+[data-theme="light"] .user-banner,
+[data-theme="light"] .join-box,
+[data-theme="light"] .stat-box,
+[data-theme="light"] .result-row{box-shadow:0 1px 4px rgba(20,15,50,0.05)}
+[data-theme="light"] .opt-btn{box-shadow:0 1px 4px rgba(20,15,50,0.05)}
+[data-theme="light"] .opt-btn:hover:not(.revealed){border-color:var(--accent);box-shadow:0 4px 14px rgba(124,58,237,0.18)}
+[data-theme="light"] .toast{box-shadow:0 8px 32px rgba(20,15,50,0.15)}
+.quiz-item .qi-icon{width:46px;height:46px;border-radius:12px;background:var(--accent-glow);display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0}
+.quiz-item .qi-info{flex:1}
+.quiz-item .qi-info h4{font-size:15px;font-weight:600}
+.quiz-item .qi-info p{color:var(--text2);font-size:13px;margin-top:2px}
+.quiz-item .qi-arrow{color:var(--text2);font-size:18px}
+
+.join-box{background:var(--card);border-radius:var(--radius);padding:18px;border:1px solid var(--border)}
+.join-box p{font-size:13px;color:var(--text2);margin-bottom:12px}
+.join-row{display:flex;gap:8px}
+.join-row .inp{flex:1}
+
+/* QUIZ INFO SCREEN */
+.quiz-info-card{background:linear-gradient(135deg,var(--accent),var(--accent2));border-radius:var(--radius);padding:28px;text-align:center;margin-bottom:20px}
+.quiz-info-card .qi-num{font-size:48px;font-weight:800;margin-bottom:4px}
+.quiz-info-card p{font-size:14px;opacity:.85}
+.info-stats{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px}
+.stat-box{background:var(--card);border-radius:var(--radius-sm);padding:16px;text-align:center;border:1px solid var(--border)}
+.stat-box .sv{font-size:28px;font-weight:800;color:var(--accent2)}
+.stat-box .sl{font-size:12px;color:var(--text2);margin-top:4px}
+
+/* QUIZ SCREEN */
+#s-quiz{overflow:hidden}
+.quiz-top{padding:52px 20px 12px;flex-shrink:0}
+.progress-bar{height:4px;background:var(--card2);border-radius:4px;overflow:hidden;margin-bottom:16px}
+.progress-fill{height:100%;background:linear-gradient(90deg,var(--accent),var(--accent2));border-radius:4px;transition:width .4s ease}
+.q-meta{display:flex;justify-content:space-between;align-items:center}
+.q-num{font-size:13px;color:var(--text2);font-weight:500}
+.q-participants{font-size:13px;color:var(--text2)}
+
+/* Timer ring */
+.timer-wrap{position:relative;width:64px;height:64px;flex-shrink:0}
+.timer-ring{transform:rotate(-90deg);width:64px;height:64px}
+.timer-bg{fill:none;stroke:var(--card2);stroke-width:4}
+.timer-fg{fill:none;stroke:var(--accent2);stroke-width:4;stroke-linecap:round;transition:stroke-dashoffset .9s linear,stroke .3s}
+.timer-text{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:17px;font-weight:800;color:var(--text)}
+.timer-row{display:flex;align-items:center;justify-content:space-between;padding:0 20px;margin-bottom:16px}
+
+.question-card{flex:1;padding:0 20px;display:flex;flex-direction:column}
+.q-text{font-size:19px;font-weight:700;line-height:1.4;margin-bottom:20px;flex:1}
+
+/* Answer options */
+.options{display:flex;flex-direction:column;gap:10px;padding:0 20px 28px;flex-shrink:0}
+.opt-btn{
+  display:flex;align-items:center;gap:14px;padding:16px 18px;
+  background:var(--card);border:2px solid var(--border);border-radius:var(--radius);
+  cursor:pointer;transition:all .2s;-webkit-user-select:none;text-align:left;
+}
+.opt-btn:active:not(.revealed){transform:scale(.98)}
+.opt-btn .opt-letter{
+  width:34px;height:34px;border-radius:8px;background:var(--card2);
+  display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;flex-shrink:0;
+  color:var(--text2);transition:all .2s;
+}
+.opt-btn .opt-text{font-size:15px;font-weight:500;flex:1;line-height:1.3}
+.opt-btn .opt-votes{font-size:12px;color:var(--text2);flex-shrink:0}
+
+/* States */
+.opt-btn.selected{border-color:var(--accent);background:rgba(124,58,237,.12)}
+.opt-btn.selected .opt-letter{background:var(--accent);color:white}
+.opt-btn.correct{border-color:var(--success);background:var(--success-bg)}
+.opt-btn.correct .opt-letter{background:var(--success);color:white}
+.opt-btn.wrong{border-color:var(--danger);background:var(--danger-bg)}
+.opt-btn.wrong .opt-letter{background:var(--danger);color:white}
+.opt-btn.revealed{cursor:default;pointer-events:none}
+
+/* Correct feedback flash */
+@keyframes correctFlash{
+  0%{transform:scale(1)}
+  30%{transform:scale(1.03)}
+  100%{transform:scale(1)}
+}
+.opt-btn.correct{animation:correctFlash .35s ease}
+
+/* RESULT SCREEN */
+.podium{display:flex;align-items:flex-end;justify-content:center;gap:8px;margin:20px 0 28px}
+.pod{display:flex;flex-direction:column;align-items:center;gap:8px}
+.pod-avatar{border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:18px;border:2px solid transparent}
+.pod-name{font-size:11px;color:var(--text2);max-width:70px;text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pod-score{font-size:12px;font-weight:700;color:var(--accent2)}
+.pod-1 .pod-avatar{width:72px;height:72px;background:linear-gradient(135deg,#f59e0b,#fbbf24);color:#1a1a2e;border-color:#f59e0b}
+.pod-2 .pod-avatar{width:56px;height:56px;background:linear-gradient(135deg,#9ca3af,#d1d5db);color:#1a1a2e;border-color:#9ca3af}
+.pod-3 .pod-avatar{width:48px;height:48px;background:linear-gradient(135deg,#b45309,#d97706);color:white;border-color:#b45309}
+.pod-bar{background:var(--card2);border-radius:6px 6px 0 0}
+.pod-1 .pod-bar{width:60px;height:80px;background:rgba(245,158,11,.2);border-top:3px solid #f59e0b}
+.pod-2 .pod-bar{width:50px;height:56px;background:rgba(156,163,175,.2);border-top:3px solid #9ca3af}
+.pod-3 .pod-bar{width:44px;height:40px;background:rgba(180,83,9,.2);border-top:3px solid #b45309}
+
+.result-list{display:flex;flex-direction:column;gap:8px;margin-bottom:20px}
+.result-row{display:flex;align-items:center;gap:12px;background:var(--card);border-radius:var(--radius-sm);padding:14px 16px;border:1px solid var(--border)}
+.result-row .rr-rank{width:28px;font-size:16px;text-align:center;flex-shrink:0}
+.result-row .rr-name{flex:1;font-weight:600}
+.result-row .rr-score{font-weight:800;color:var(--accent2)}
+.result-row .rr-pct{font-size:12px;color:var(--text2);margin-left:6px}
+
+/* CONFETTI */
+.confetti-wrap{position:fixed;inset:0;pointer-events:none;z-index:999;overflow:hidden}
+.cf{position:absolute;width:10px;height:10px;border-radius:2px;animation:cfFall linear forwards}
+@keyframes cfFall{
+  0%{transform:translateY(-20px) rotate(0deg);opacity:1}
+  100%{transform:translateY(100vh) rotate(720deg);opacity:0}
+}
+
+/* TOAST */
+.toast{position:fixed;bottom:32px;left:50%;transform:translateX(-50%) translateY(80px);background:var(--card2);color:var(--text);padding:12px 20px;border-radius:30px;font-size:14px;font-weight:500;z-index:1000;transition:transform .3s;white-space:nowrap;border:1px solid var(--border);box-shadow:0 8px 32px rgba(0,0,0,.4)}
+.toast.show{transform:translateX(-50%) translateY(0)}
+.toast.success{border-color:var(--success);color:var(--success)}
+.toast.error{border-color:var(--danger);color:var(--danger)}
+
+/* WAITING */
+.waiting-dots span{display:inline-block;animation:dot .8s infinite;opacity:0}
+.waiting-dots span:nth-child(2){animation-delay:.2s}
+.waiting-dots span:nth-child(3){animation-delay:.4s}
+@keyframes dot{50%{opacity:1}}
+
+.empty{text-align:center;padding:40px 20px;color:var(--text2)}
+.empty .ei{font-size:48px;margin-bottom:12px}
+
+/* ── SHAXSIY NATIJA KARTA (Final Summary) ─────────────────────────────── */
+.final-card{
+  background:linear-gradient(160deg,var(--card) 0%,var(--card2) 100%);
+  border:1px solid var(--border);border-radius:var(--radius);
+  padding:24px 22px;margin-bottom:18px;text-align:center;
+  position:relative;overflow:hidden;
+  animation:cardPop .6s cubic-bezier(.34,1.56,.64,1);
+}
+.final-card::before{
+  content:'';position:absolute;inset:-50% -10% auto -10%;height:80%;
+  background:radial-gradient(ellipse at center,var(--accent-glow) 0%,transparent 70%);
+  opacity:.6;pointer-events:none;
+}
+.final-card .fc-icon{font-size:48px;margin-bottom:8px;animation:bounce 2s infinite;display:inline-block}
+.final-card .fc-title{font-size:18px;font-weight:800;margin-bottom:4px;position:relative;z-index:1}
+.final-card .fc-subtitle{font-size:13px;color:var(--text2);margin-bottom:18px;position:relative;z-index:1}
+.final-card .fc-score{
+  font-size:56px;font-weight:900;
+  background:linear-gradient(135deg,var(--accent),var(--accent2));
+  -webkit-background-clip:text;background-clip:text;
+  -webkit-text-fill-color:transparent;
+  line-height:1;margin-bottom:6px;position:relative;z-index:1;
+  display:inline-block;animation:scoreCountUp .8s ease-out;
+}
+.final-card .fc-score-label{font-size:13px;color:var(--text2);margin-bottom:16px;position:relative;z-index:1}
+.final-card .fc-stats{
+  display:grid;grid-template-columns:repeat(3,1fr);gap:8px;
+  margin-bottom:14px;position:relative;z-index:1;
+}
+.final-card .fc-stat{
+  background:var(--card2);border-radius:var(--radius-sm);
+  padding:10px 6px;border:1px solid var(--border);
+  transition:transform .2s;
+}
+.final-card .fc-stat:hover{transform:translateY(-2px)}
+.final-card .fc-stat .fcs-icon{font-size:18px;margin-bottom:2px}
+.final-card .fc-stat .fcs-val{font-size:18px;font-weight:800;color:var(--text)}
+.final-card .fc-stat .fcs-lbl{font-size:10px;color:var(--text2);text-transform:uppercase;letter-spacing:.05em;margin-top:2px}
+.final-card .fc-stat.correct .fcs-val{color:var(--success)}
+.final-card .fc-stat.wrong .fcs-val{color:var(--danger)}
+.final-card .fc-stat.skip .fcs-val{color:#f59e0b}
+.final-card .fc-time{
+  display:inline-flex;align-items:center;gap:6px;
+  background:var(--card2);padding:8px 14px;border-radius:20px;
+  font-size:13px;font-weight:600;border:1px solid var(--border);
+  position:relative;z-index:1;
+}
+.final-card .fc-rank{
+  display:inline-flex;align-items:center;gap:6px;
+  margin-left:8px;padding:8px 14px;border-radius:20px;font-weight:700;
+  font-size:13px;border:1px solid;position:relative;z-index:1;
+}
+.final-card .fc-rank.rank-gold{background:rgba(245,158,11,0.15);color:#fbbf24;border-color:rgba(245,158,11,0.3)}
+.final-card .fc-rank.rank-silver{background:rgba(156,163,175,0.15);color:#d1d5db;border-color:rgba(156,163,175,0.3)}
+.final-card .fc-rank.rank-bronze{background:rgba(180,83,9,0.15);color:#fbb78a;border-color:rgba(180,83,9,0.3)}
+.final-card .fc-rank.rank-default{background:var(--card);color:var(--text2);border-color:var(--border)}
+.final-card .fc-msg{
+  margin-top:14px;padding:10px 14px;border-radius:var(--radius-sm);
+  font-size:13px;font-weight:500;position:relative;z-index:1;
+}
+.final-card .fc-msg.perfect{background:rgba(16,185,129,0.12);color:var(--success);border:1px solid rgba(16,185,129,0.3)}
+.final-card .fc-msg.good{background:rgba(124,58,237,0.12);color:var(--accent2);border:1px solid rgba(124,58,237,0.3)}
+.final-card .fc-msg.fail{background:rgba(239,68,68,0.10);color:var(--danger);border:1px solid rgba(239,68,68,0.25)}
+.final-card .fc-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:14px;position:relative;z-index:1}
+.final-card .fc-actions .btn{padding:12px;font-size:14px}
+
+/* ── ANIMATIONS ───────────────────────────────────────────────────────── */
+@keyframes cardPop{
+  0%{transform:scale(.85) translateY(20px);opacity:0}
+  100%{transform:scale(1) translateY(0);opacity:1}
+}
+@keyframes scoreCountUp{
+  0%{transform:scale(.4);opacity:0}
+  60%{transform:scale(1.15)}
+  100%{transform:scale(1);opacity:1}
+}
+@keyframes bounce{
+  0%,100%{transform:translateY(0)}
+  50%{transform:translateY(-6px)}
+}
+@keyframes pulseCorrect{
+  0%{box-shadow:0 0 0 0 rgba(16,185,129,0.6)}
+  70%{box-shadow:0 0 0 14px rgba(16,185,129,0)}
+  100%{box-shadow:0 0 0 0 rgba(16,185,129,0)}
+}
+.opt-btn.pulse-correct{animation:pulseCorrect 0.9s ease-out,correctFlash .35s ease}
+@keyframes shake{
+  0%,100%{transform:translateX(0)}
+  20%{transform:translateX(-8px)}
+  40%{transform:translateX(8px)}
+  60%{transform:translateX(-6px)}
+  80%{transform:translateX(6px)}
+}
+.opt-btn.shake{animation:shake .45s cubic-bezier(.36,.07,.19,.97)}
+
+/* Sparkles */
+.sparkle{
+  position:absolute;width:14px;height:14px;
+  background:radial-gradient(circle,#fef9c3 0%,#fbbf24 60%,transparent 70%);
+  border-radius:50%;pointer-events:none;
+  animation:sparkleFly .9s ease-out forwards;
+  z-index:50;
+}
+@keyframes sparkleFly{
+  0%{transform:translate(0,0) scale(0);opacity:1}
+  20%{opacity:1;transform:translate(var(--tx,0),var(--ty,0)) scale(1)}
+  100%{transform:translate(calc(var(--tx,0)*1.8),calc(var(--ty,0)*1.8 + 30px)) scale(.2);opacity:0}
+}
+
+/* Screen entry */
+.screen.active{animation:screenIn .4s ease}
+@keyframes screenIn{
+  0%{opacity:0;transform:translateX(20%)}
+  100%{opacity:1;transform:translateX(0)}
+}
+
+/* Quiz item entrance stagger */
+.quiz-item{animation:itemIn .35s ease backwards}
+.quiz-item:nth-child(1){animation-delay:.02s}
+.quiz-item:nth-child(2){animation-delay:.06s}
+.quiz-item:nth-child(3){animation-delay:.10s}
+.quiz-item:nth-child(4){animation-delay:.14s}
+.quiz-item:nth-child(5){animation-delay:.18s}
+.quiz-item:nth-child(6){animation-delay:.22s}
+.quiz-item:nth-child(n+7){animation-delay:.26s}
+@keyframes itemIn{
+  0%{opacity:0;transform:translateY(12px)}
+  100%{opacity:1;transform:translateY(0)}
+}
+
+/* Result row entrance */
+.result-row{animation:rowIn .45s ease backwards}
+.result-row:nth-child(1){animation-delay:.05s}
+.result-row:nth-child(2){animation-delay:.10s}
+.result-row:nth-child(3){animation-delay:.15s}
+.result-row:nth-child(4){animation-delay:.20s}
+.result-row:nth-child(5){animation-delay:.25s}
+.result-row:nth-child(n+6){animation-delay:.30s}
+@keyframes rowIn{
+  0%{opacity:0;transform:translateX(-20px)}
+  100%{opacity:1;transform:translateX(0)}
+}
+
+/* Podium rise */
+.pod{animation:podiumRise .7s cubic-bezier(.34,1.56,.64,1) backwards}
+.pod-1{animation-delay:.4s}
+.pod-2{animation-delay:.2s}
+.pod-3{animation-delay:.6s}
+@keyframes podiumRise{
+  0%{transform:translateY(60px);opacity:0}
+  100%{transform:translateY(0);opacity:1}
+}
+
+/* Floating emojis (background celebration) */
+.floater{
+  position:fixed;bottom:-40px;font-size:28px;
+  pointer-events:none;z-index:998;
+  animation:floatUp 4s ease-out forwards;
+}
+@keyframes floatUp{
+  0%{transform:translateY(0) rotate(0);opacity:0}
+  10%{opacity:1}
+  100%{transform:translateY(-110vh) rotate(360deg);opacity:0}
+}
+
+/* Star burst (full-screen flash) */
+.star-burst{
+  position:fixed;inset:0;pointer-events:none;z-index:997;
+  background:radial-gradient(circle at center,rgba(124,58,237,0.3) 0%,transparent 60%);
+  animation:burst .8s ease-out forwards;
+}
+@keyframes burst{
+  0%{opacity:0;transform:scale(.5)}
+  50%{opacity:1}
+  100%{opacity:0;transform:scale(1.5)}
+}
+
+/* Selection pulse for option just tapped */
+.opt-btn.selected{animation:selPulse .25s ease}
+@keyframes selPulse{
+  0%{transform:scale(1)}
+  50%{transform:scale(.96)}
+  100%{transform:scale(1)}
+}
+</style>
+</head>
+<body>
+<div id="root">
+<!-- LOGIN -->
+<div class="screen active" id="s-login">
+  <div class="logo-wrap">
+    <span class="emoji">🤖</span>
+    <h1>QuizBot</h1>
+    <p>Ro'yxatdan o'ting va boshlang!</p>
+  </div>
+  <div class="login-form">
+    <div class="input-group">
+      <label>👤 Ismingiz</label>
+      <input class="inp" id="inp-name" placeholder="Ali Karimov" maxlength="30"/>
+    </div>
+    <div class="input-group">
+      <label>📞 Telefon raqam</label>
+      <input class="inp" id="inp-phone" placeholder="+998 90 123 45 67" type="tel" maxlength="20"/>
+    </div>
+    <button class="btn btn-primary" onclick="doRegister()">Davom etish →</button>
+  </div>
+</div>
+
+<!-- HOME -->
+<div class="screen" id="s-home">
+  <div class="hdr" style="background:var(--bg)">
+    <h2>🏠 Bosh sahifa</h2>
+    <button class="hdr-icon" id="btn-theme" onclick="toggleAppTheme()" title="Mavzu">🌙</button>
+    <button class="btn btn-sm btn-secondary" onclick="doLogout()">Chiqish</button>
+  </div>
+  <div class="pad">
+    <div class="user-banner" id="user-banner">
+      <div class="avatar" id="avatar-letter">A</div>
+      <div class="user-info"><h3 id="username-display">Ali</h3><p id="userphone-display">+998...</p></div>
+    </div>
+    <div class="section-title">📚 Mavjud testlar</div>
+    <div class="search-row">
+      <div class="search-box" id="search-box">
+        <input class="search-inp" id="quiz-search" placeholder="Test izlash..." oninput="onSearchInput()" />
+        <button class="clear-btn" onclick="clearSearch()" title="Tozalash">✕</button>
+      </div>
+      <select class="sort-select" id="quiz-sort" onchange="renderQuizList()" title="Saralash">
+        <option value="new">🆕 Yangi</option>
+        <option value="old">📅 Eski</option>
+        <option value="title">🔤 A-Z</option>
+        <option value="short">⚡ Qisqa</option>
+        <option value="long">📚 Uzun</option>
+      </select>
+    </div>
+    <div class="chip-row" id="chip-row">
+      <button class="chip active" data-chip="all" onclick="setChipFilter('all')">Hammasi</button>
+      <button class="chip" data-chip="short" onclick="setChipFilter('short')">⚡ ≤10 savol</button>
+      <button class="chip" data-chip="medium" onclick="setChipFilter('medium')">📝 11-30</button>
+      <button class="chip" data-chip="long" onclick="setChipFilter('long')">📚 30+</button>
+      <button class="chip" data-chip="fast" onclick="setChipFilter('fast')">⏱ Tez (&lt;20s)</button>
+    </div>
+    <span class="filter-count" id="filter-count"></span>
+    <div id="quiz-list"></div>
+    <div class="section-title" style="margin-top:20px">🔗 Guruh testiga qo'shilish</div>
+    <div class="join-box">
+      <p>Telegram guruhda test boshlanganda havolani oling yoki chatId kiriting</p>
+      <div class="join-row">
+        <input class="inp" id="inp-join" placeholder="ChatId (masalan: -100123456)"/>
+        <button class="btn btn-sm btn-primary" onclick="joinByCode()">Qo'shilish</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- QUIZ INFO -->
+<div class="screen" id="s-info">
+  <div class="hdr">
+    <button class="hdr-back" onclick="goBack('s-home')">‹</button>
+    <h2 id="info-title">Test haqida</h2>
+  </div>
+  <div class="pad">
+    <div class="quiz-info-card">
+      <div class="qi-num" id="info-q-count">0</div>
+      <p>ta savol</p>
+    </div>
+    <div class="info-stats">
+      <div class="stat-box"><div class="sv" id="info-time">30</div><div class="sl">⏱ soniya/savol</div></div>
+      <div class="stat-box"><div class="sv" id="info-mode">🎮</div><div class="sl">Yakkama-yakka</div></div>
+    </div>
+    <button class="btn btn-primary" id="btn-start-quiz" onclick="startQuiz()">🚀 Testni boshlash</button>
+  </div>
+</div>
+
+<!-- QUIZ PLAYING -->
+<div class="screen" id="s-quiz">
+  <div class="quiz-top">
+    <div class="progress-bar"><div class="progress-fill" id="q-progress" style="width:10%"></div></div>
+    <div class="q-meta">
+      <span class="q-num" id="q-num">Savol 1/10</span>
+      <span class="q-participants" id="q-participants">👥 0 javob</span>
+    </div>
+  </div>
+  <div class="timer-row">
+    <div class="q-text" id="q-text">Savol yuklanmoqda...</div>
+    <div class="timer-wrap">
+      <svg class="timer-ring" viewBox="0 0 64 64">
+        <circle class="timer-bg" cx="32" cy="32" r="28"/>
+        <circle class="timer-fg" id="timer-circle" cx="32" cy="32" r="28" stroke-dasharray="175.9" stroke-dashoffset="0"/>
+      </svg>
+      <div class="timer-text" id="timer-num">30</div>
+    </div>
+  </div>
+  <div class="options" id="options"></div>
+</div>
+
+<!-- RESULTS -->
+<div class="screen" id="s-result">
+  <div class="hdr">
+    <h2>🏆 Natijalar</h2>
+    <div class="hdr-badge" id="result-badge">10/10</div>
+  </div>
+  <div class="pad">
+    <!-- Shaxsiy tabriklash kartasi -->
+    <div class="final-card" id="final-card">
+      <div class="fc-icon" id="fc-icon">🏁</div>
+      <div class="fc-title" id="fc-title">Test yakunlandi!</div>
+      <div class="fc-subtitle" id="fc-subtitle"></div>
+      <div class="fc-score" id="fc-score">0</div>
+      <div class="fc-score-label">to'g'ri javob</div>
+      <div class="fc-stats">
+        <div class="fc-stat correct">
+          <div class="fcs-icon">✅</div>
+          <div class="fcs-val" id="fc-correct">0</div>
+          <div class="fcs-lbl">To'g'ri</div>
+        </div>
+        <div class="fc-stat wrong">
+          <div class="fcs-icon">❌</div>
+          <div class="fcs-val" id="fc-wrong">0</div>
+          <div class="fcs-lbl">Xato</div>
+        </div>
+        <div class="fc-stat skip">
+          <div class="fcs-icon">⏳</div>
+          <div class="fcs-val" id="fc-skip">0</div>
+          <div class="fcs-lbl">Tashlandi</div>
+        </div>
+      </div>
+      <div>
+        <span class="fc-time">⏱ <span id="fc-time">0:00</span></span>
+        <span class="fc-rank rank-default" id="fc-rank">🎖 -</span>
+      </div>
+      <div class="fc-msg" id="fc-msg"></div>
+      <div class="fc-actions">
+        <button class="btn btn-primary" onclick="restartLastQuiz()">🔄 Qaytadan</button>
+        <button class="btn btn-secondary" onclick="goHome()">🏠 Bosh sahifa</button>
+      </div>
+    </div>
+
+    <div class="section-title" style="margin-top:10px">🏆 Yetakchilar jadvali</div>
+    <div class="podium" id="podium"></div>
+    <div class="result-list" id="result-list"></div>
+  </div>
+</div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ── STATE ──────────────────────────────────────────────────────────────────
+const S = {
+  user: null,        // {id, name, token}
+  quiz: null,        // selected quiz info
+  joinChatId: null,  // for group join
+  session: null,     // {sessionId, chatId, quizTitle, total}
+  currentQ: null,    // current question
+  answered: false,
+  score: 0,          // correct answers count
+  wrong: 0,          // wrong answers count
+  totalAnswered: 0,
+  startTime: 0,      // ms timestamp when quiz started
+  sse: null,         // EventSource
+  timerInterval: null,
+  timerSec: 0,
+  screens: [],
+  quizzes: [],       // all quizzes loaded from server
+  chipFilter: 'all', // chip filter for quiz list
+  lastQuiz: null,    // remember last quiz for "Qaytadan urinish"
+};
+const CIRC = 175.9; // 2*PI*28
+
+// ── THEME ─────────────────────────────────────────────────────────────────
+(function initAppTheme() {
+  const saved = localStorage.getItem('qb_theme');
+  const prefersLight = window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches;
+  applyAppTheme(saved || (prefersLight ? 'light' : 'dark'));
+})();
+
+function applyAppTheme(theme) {
+  if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+  else document.documentElement.removeAttribute('data-theme');
+  localStorage.setItem('qb_theme', theme);
+  const btn = document.getElementById('btn-theme');
+  if (btn) btn.textContent = theme === 'light' ? '☀️' : '🌙';
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if (meta) meta.setAttribute('content', theme === 'light' ? '#f5f6fb' : '#1a1033');
+}
+
+function toggleAppTheme() {
+  const current = document.documentElement.getAttribute('data-theme') === 'light' ? 'light' : 'dark';
+  applyAppTheme(current === 'light' ? 'dark' : 'light');
+}
+
+// ── INIT ──────────────────────────────────────────────────────────────────
+window.addEventListener('load', () => {
+  // Re-apply theme to sync the button icon after DOM ready
+  applyAppTheme(localStorage.getItem('qb_theme') || 'dark');
+
+  const saved = localStorage.getItem('qb_user');
+  if (saved) {
+    S.user = JSON.parse(saved);
+    showHome();
+  } else {
+    showScreen('s-login');
+  }
+
+  // URL param: ?join=chatId
+  const url = new URL(location.href);
+  const join = url.searchParams.get('join');
+  if (join) {
+    document.getElementById('inp-join').value = join;
+  }
+});
+
+// ── SCREENS ───────────────────────────────────────────────────────────────
+function showScreen(id) {
+  const prev = S.screens[S.screens.length - 1];
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active', 'prev'));
+  if (prev && prev !== id) {
+    document.getElementById(prev)?.classList.add('prev');
+  }
+  S.screens.push(id);
+  document.getElementById(id)?.classList.add('active');
+}
+
+function goBack(to) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active', 'prev'));
+  document.getElementById(to)?.classList.add('active');
+  while (S.screens.length > 1 && S.screens[S.screens.length - 1] !== to) S.screens.pop();
+}
+
+function goHome() {
+  disconnectSSE();
+  S.screens = [];
+  S.session = null;
+  S.currentQ = null;
+  S.answered = false;
+  S.score = 0;
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active', 'prev'));
+  document.getElementById('s-home')?.classList.add('active');
+  S.screens = ['s-home'];
+  loadQuizzes();
+}
+
+// ── AUTH ──────────────────────────────────────────────────────────────────
+async function doRegister() {
+  const name = document.getElementById('inp-name').value.trim();
+  const phone = document.getElementById('inp-phone').value.trim();
+  if (!name) { showToast('Ismingizni kiriting', 'error'); return; }
+  if (!phone) { showToast('Telefon raqam kiriting', 'error'); return; }
+
+  try {
+    const res = await api('POST', '/api/users/register', { name, phone });
+    S.user = res;
+    localStorage.setItem('qb_user', JSON.stringify(res));
+    showHome();
+  } catch (e) {
+    showToast(e.message, 'error');
+  }
+}
+
+function doLogout() {
+  localStorage.removeItem('qb_user');
+  S.user = null;
+  disconnectSSE();
+  S.screens = [];
+  showScreen('s-login');
+}
+
+// ── HOME ──────────────────────────────────────────────────────────────────
+async function showHome() {
+  document.getElementById('username-display').textContent = S.user.name;
+  document.getElementById('userphone-display').textContent = S.user.phone || '';
+  document.getElementById('avatar-letter').textContent = S.user.name[0].toUpperCase();
+  showScreen('s-home');
+  await loadQuizzes();
+
+  // Auto-fill join if URL param
+  const join = new URL(location.href).searchParams.get('join');
+  if (join) document.getElementById('inp-join').value = join;
+}
+
+async function loadQuizzes() {
+  const el = document.getElementById('quiz-list');
+  el.innerHTML = '<div class="empty"><div class="ei">⏳</div><p>Yuklanmoqda...</p></div>';
+  try {
+    const quizzes = await api('GET', '/api/quizzes/active');
+    S.quizzes = quizzes;
+    renderQuizList();
+  } catch (e) {
+    el.innerHTML = '<div class="empty"><div class="ei">❌</div><p>Yuklab bo\'lmadi</p></div>';
+  }
+}
+
+function onSearchInput() {
+  const inp = document.getElementById('quiz-search');
+  const box = document.getElementById('search-box');
+  if (box) box.classList.toggle('has-value', !!inp.value);
+  renderQuizList();
+}
+
+function clearSearch() {
+  const inp = document.getElementById('quiz-search');
+  inp.value = '';
+  document.getElementById('search-box')?.classList.remove('has-value');
+  renderQuizList();
+  inp.focus();
+}
+
+function setChipFilter(name) {
+  S.chipFilter = name;
+  document.querySelectorAll('#chip-row .chip').forEach(c => {
+    c.classList.toggle('active', c.dataset.chip === name);
+  });
+  renderQuizList();
+}
+
+function renderQuizList() {
+  const el = document.getElementById('quiz-list');
+  const cntEl = document.getElementById('filter-count');
+  if (!el) return;
+
+  const search = (document.getElementById('quiz-search')?.value || '').toLowerCase().trim();
+  const sort = document.getElementById('quiz-sort')?.value || 'new';
+
+  let list = S.quizzes.slice();
+
+  // Chip filters by question count and time
+  if (S.chipFilter === 'short') list = list.filter(q => (q._count?.questions || 0) <= 10);
+  else if (S.chipFilter === 'medium') list = list.filter(q => {
+    const c = q._count?.questions || 0;
+    return c > 10 && c <= 30;
+  });
+  else if (S.chipFilter === 'long') list = list.filter(q => (q._count?.questions || 0) > 30);
+  else if (S.chipFilter === 'fast') list = list.filter(q => q.timeLimit < 20);
+
+  // Search by title / description
+  if (search) {
+    list = list.filter(q =>
+      q.title.toLowerCase().includes(search) ||
+      (q.description || '').toLowerCase().includes(search)
+    );
+  }
+
+  // Sort
+  if (sort === 'old') list.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+  else if (sort === 'new') list.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+  else if (sort === 'title') list.sort((a, b) => a.title.localeCompare(b.title, 'uz'));
+  else if (sort === 'short') list.sort((a, b) => (a._count?.questions || 0) - (b._count?.questions || 0));
+  else if (sort === 'long') list.sort((a, b) => (b._count?.questions || 0) - (a._count?.questions || 0));
+
+  if (cntEl) cntEl.textContent = `${list.length} / ${S.quizzes.length} ta test`;
+
+  if (!S.quizzes.length) {
+    el.innerHTML = '<div class="empty"><div class="ei">📭</div><p>Hozircha testlar yo\'q</p></div>';
+    return;
+  }
+  if (!list.length) {
+    el.innerHTML = '<div class="empty"><div class="ei">🔍</div><p>Filterga mos test topilmadi</p></div>';
+    return;
+  }
+
+  el.innerHTML = list.map(q => `
+    <div class="quiz-item" onclick="selectQuizById(${q.id})">
+      <div class="qi-icon">📚</div>
+      <div class="qi-info">
+        <h4>${esc(q.title)}</h4>
+        <p>${q._count.questions} savol · ${q.timeLimit}s/savol${q.description ? ' · ' + esc(q.description).slice(0, 40) : ''}</p>
+      </div>
+      <span class="qi-arrow">›</span>
+    </div>
+  `).join('');
+}
+
+function selectQuizById(id) {
+  const q = S.quizzes.find(x => x.id === id);
+  if (!q) { showToast('Test topilmadi', 'error'); return; }
+  selectQuiz(q.id, q.title, q.timeLimit, q._count.questions);
+}
+
+// ── JOIN GROUP ────────────────────────────────────────────────────────────
+async function joinByCode() {
+  const code = document.getElementById('inp-join').value.trim();
+  if (!code) { showToast('Chat kodini kiriting', 'error'); return; }
+
+  try {
+    const sessions = await api('GET', '/api/sessions/active');
+    const session = sessions.find(s => s.chatId === code || s.chatId === `-${code}` || s.id === parseInt(code));
+
+    if (!session) { showToast('Aktiv sessiya topilmadi', 'error'); return; }
+
+    S.session = { sessionId: session.id, chatId: session.chatId, quizTitle: session.quiz.title, total: 0 };
+    S.score = 0;
+    S.wrong = 0;
+    S.totalAnswered = 0;
+    S.startTime = Date.now();
+    S.answered = false;
+    connectSSE(session.chatId);
+    startQuizScreen(session.quiz.title, '?');
+  } catch (e) { showToast(e.message, 'error'); }
+}
+
+// ── SOLO QUIZ ─────────────────────────────────────────────────────────────
+function selectQuiz(id, title, timeLimit, count) {
+  S.quiz = { id, title, timeLimit, questionCount: count };
+  S.lastQuiz = { ...S.quiz };
+  document.getElementById('info-title').textContent = title;
+  document.getElementById('info-q-count').textContent = count;
+  document.getElementById('info-time').textContent = timeLimit;
+  showScreen('s-info');
+}
+
+async function startQuiz() {
+  if (!S.quiz) return;
+  S.lastQuiz = { ...S.quiz };
+  document.getElementById('btn-start-quiz').textContent = 'Yuklanmoqda...';
+  try {
+    const res = await api('POST', '/api/sessions/solo', {
+      quizId: S.quiz.id,
+      userId: S.user.id,
+      username: S.user.name,
+    });
+    S.session = res;
+    S.score = 0;
+    S.wrong = 0;
+    S.totalAnswered = 0;
+    S.startTime = Date.now();
+    S.answered = false;
+    connectSSE(res.chatId);
+    startQuizScreen(res.quizTitle, res.total);
+  } catch (e) {
+    showToast(e.message, 'error');
+  } finally {
+    document.getElementById('btn-start-quiz').textContent = '🚀 Testni boshlash';
+  }
+}
+
+function startQuizScreen(title, total) {
+  document.getElementById('q-text').innerHTML = `<span class="waiting-dots">Tayyorlanmoqda<span>.</span><span>.</span><span>.</span></span>`;
+  document.getElementById('options').innerHTML = '';
+  document.getElementById('q-num').textContent = `${title}`;
+  document.getElementById('q-participants').textContent = '';
+  showScreen('s-quiz');
+}
+
+// ── SSE ───────────────────────────────────────────────────────────────────
+function connectSSE(chatId) {
+  disconnectSSE();
+  S.sse = new EventSource(`/api/events/${encodeURIComponent(chatId)}`);
+
+  S.sse.addEventListener('question', e => {
+    const d = JSON.parse(e.data);
+    S.session.total = d.total;
+    renderQuestion(d);
+  });
+
+  S.sse.addEventListener('answer_count', e => {
+    const d = JSON.parse(e.data);
+    document.getElementById('q-participants').textContent = `👥 ${d.count} javob`;
+  });
+
+  S.sse.addEventListener('question_result', e => {
+    const d = JSON.parse(e.data);
+    revealAnswer(d);
+  });
+
+  S.sse.addEventListener('quiz_end', e => {
+    const d = JSON.parse(e.data);
+    showResults(d);
+  });
+
+  S.sse.onerror = () => {
+    // silent reconnect
+  };
+}
+
+function disconnectSSE() {
+  if (S.sse) { S.sse.close(); S.sse = null; }
+  if (S.timerInterval) { clearInterval(S.timerInterval); S.timerInterval = null; }
+}
+
+// ── QUESTION RENDERING ────────────────────────────────────────────────────
+function renderQuestion(d) {
+  S.currentQ = d;
+  S.answered = false;
+  S.totalAnswered = 0;
+
+  const cur = d.current, tot = d.total;
+  const pct = Math.round((cur / tot) * 100);
+
+  document.getElementById('q-progress').style.width = pct + '%';
+  document.getElementById('q-num').textContent = `Savol ${cur}/${tot}`;
+  document.getElementById('q-participants').textContent = '👥 0 javob';
+  document.getElementById('q-text').textContent = d.text;
+
+  const L = ['A', 'B', 'C', 'D'];
+  document.getElementById('options').innerHTML = d.options.map((opt, i) => `
+    <button class="opt-btn" id="opt-${i}" onclick="submitAnswer(${i})">
+      <span class="opt-letter">${L[i]}</span>
+      <span class="opt-text">${esc(opt)}</span>
+      <span class="opt-votes"></span>
+    </button>
+  `).join('');
+
+  startTimer(d.timeLimit);
+}
+
+// ── TIMER ─────────────────────────────────────────────────────────────────
+function startTimer(seconds) {
+  if (S.timerInterval) clearInterval(S.timerInterval);
+  S.timerSec = seconds;
+  updateTimerUI(seconds, seconds);
+
+  S.timerInterval = setInterval(() => {
+    S.timerSec--;
+    updateTimerUI(S.timerSec, seconds);
+    if (S.timerSec <= 0) clearInterval(S.timerInterval);
+  }, 1000);
+}
+
+function updateTimerUI(rem, total) {
+  const pct = Math.max(0, rem / total);
+  const offset = CIRC * (1 - pct);
+  const circle = document.getElementById('timer-circle');
+  if (!circle) return;
+  circle.style.strokeDashoffset = offset;
+
+  // Color: green → yellow → red
+  const hue = Math.round(pct * 120); // 120=green, 0=red
+  circle.style.stroke = `hsl(${hue},85%,55%)`;
+
+  document.getElementById('timer-num').textContent = Math.max(0, rem);
+}
+
+// ── ANSWER ────────────────────────────────────────────────────────────────
+async function submitAnswer(idx) {
+  if (S.answered || !S.currentQ || !S.session) return;
+  S.answered = true;
+
+  document.querySelectorAll('.opt-btn').forEach(b => b.classList.add('revealed'));
+  document.getElementById(`opt-${idx}`)?.classList.add('selected');
+
+  try {
+    const res = await api('POST', `/api/sessions/${encodeURIComponent(S.session.chatId)}/answer`, {
+      questionId: S.currentQ.questionId,
+      userId: S.user.id,
+      username: S.user.name,
+      chosen: idx,
+    });
+
+    if (res.alreadyAnswered) {
+      showToast('✔️ Allaqachon javob bergansiz!');
+      return;
+    }
+
+    S.totalAnswered++;
+    if (res.isCorrect) {
+      S.score++;
+      const btn = document.getElementById(`opt-${idx}`);
+      btn?.classList.add('correct');
+      btn?.classList.add('pulse-correct');
+      spawnSparkles(btn);
+      showToast('✅ To\'g\'ri javob!', 'success');
+      spawnConfetti(40);
+      vibrate([30, 50, 30]);
+    } else {
+      S.wrong++;
+      const btn = document.getElementById(`opt-${idx}`);
+      btn?.classList.add('wrong');
+      btn?.classList.add('shake');
+      const correctBtn = document.getElementById(`opt-${res.correct}`);
+      correctBtn?.classList.add('correct', 'pulse-correct');
+      showToast(`❌ Noto\'g\'ri! To\'g\'ri: ${['A','B','C','D'][res.correct]}`, 'error');
+      vibrate([100, 30, 100]);
+    }
+  } catch (e) {
+    S.answered = false;
+    showToast(e.message, 'error');
+  }
+}
+
+// ── REVEAL ANSWER ─────────────────────────────────────────────────────────
+function revealAnswer(d) {
+  if (S.timerInterval) { clearInterval(S.timerInterval); S.timerInterval = null; }
+  updateTimerUI(0, 1);
+
+  const btns = document.querySelectorAll('.opt-btn');
+  btns.forEach((b, i) => {
+    b.classList.add('revealed');
+    const votes = d.answerCounts?.[i] || 0;
+    b.querySelector('.opt-votes').textContent = votes > 0 ? votes : '';
+    if (i === d.correctIndex) {
+      b.classList.remove('selected', 'wrong');
+      b.classList.add('correct');
+    } else if (b.classList.contains('selected')) {
+      b.classList.add('wrong');
+    }
+  });
+
+  if (d.explain) showToast(`💡 ${d.explain}`);
+}
+
+// ── RESULTS ───────────────────────────────────────────────────────────────
+function showResults(d) {
+  disconnectSSE();
+  const totalQ = d.totalQuestions || S.session?.total || 1;
+  const results = d.results || [];
+
+  document.getElementById('result-badge').textContent = `${S.score}/${totalQ}`;
+
+  // ── Shaxsiy tabriklash kartasi ─────────────────────────────────────────
+  const myName = S.user?.name;
+  const myRank = results.findIndex(u => u.username === myName) + 1;
+  const correct = S.score;
+  const wrong = S.wrong;
+  const skipped = Math.max(0, totalQ - correct - wrong);
+  const pct = Math.round((correct / totalQ) * 100);
+  const elapsed = Math.floor((Date.now() - (S.startTime || Date.now())) / 1000);
+  const em = Math.floor(elapsed / 60), es = elapsed % 60;
+
+  // Karta ichiga ma'lumotlarni joylash
+  const icon = pct === 100 ? '🎉' : pct >= 70 ? '🏆' : pct >= 40 ? '👏' : '💪';
+  const titleTxt = pct === 100
+    ? `Zo'r! ${esc(myName || 'Siz')}, mukammal natija!`
+    : pct >= 70
+      ? `Ajoyib, ${esc(myName || 'Siz')}!`
+      : pct >= 40
+        ? `Yaxshi harakat, ${esc(myName || 'Siz')}!`
+        : `Davom eting, ${esc(myName || 'Siz')}!`;
+  const subTxt = `"${esc(S.session?.quizTitle || S.lastQuiz?.title || '')}" testi yakunlandi`;
+
+  let msgClass = 'good', msgText = '';
+  if (pct === 100) { msgClass = 'perfect'; msgText = '🌟 Mukammal natija — 100% to\'g\'ri!'; }
+  else if (pct >= 70) { msgClass = 'good'; msgText = '👍 Ajoyib natija — davom eting!'; }
+  else if (pct >= 40) { msgClass = 'good'; msgText = '💡 Yaxshi, lekin yana yaxshilash mumkin'; }
+  else { msgClass = 'fail'; msgText = '📚 Materialni qaytadan o\'rganib chiqing'; }
+
+  const rankEl = document.getElementById('fc-rank');
+  rankEl.className = 'fc-rank rank-default';
+  let rankTxt = '🎖 -';
+  if (myRank === 1) { rankTxt = `🥇 1-o'rin`; rankEl.classList.add('rank-gold'); }
+  else if (myRank === 2) { rankTxt = `🥈 2-o'rin`; rankEl.classList.add('rank-silver'); }
+  else if (myRank === 3) { rankTxt = `🥉 3-o'rin`; rankEl.classList.add('rank-bronze'); }
+  else if (myRank > 0) { rankTxt = `🏅 ${myRank}-o'rin`; }
+  rankEl.textContent = rankTxt;
+
+  document.getElementById('fc-icon').textContent = icon;
+  document.getElementById('fc-title').textContent = titleTxt;
+  document.getElementById('fc-subtitle').textContent = subTxt;
+  document.getElementById('fc-correct').textContent = correct;
+  document.getElementById('fc-wrong').textContent = wrong;
+  document.getElementById('fc-skip').textContent = skipped;
+  document.getElementById('fc-time').textContent = `${em}:${String(es).padStart(2, '0')}`;
+  const msgEl = document.getElementById('fc-msg');
+  msgEl.className = `fc-msg ${msgClass}`;
+  msgEl.textContent = msgText;
+
+  // Score animatsiya - 0 dan to'g'ri raqamga
+  animateCount(document.getElementById('fc-score'), 0, correct, 1000);
+  // Restart kartasini qayta animatsiya qilish uchun reset
+  const fcCard = document.getElementById('final-card');
+  fcCard.style.animation = 'none';
+  void fcCard.offsetWidth;
+  fcCard.style.animation = '';
+
+  // Podium (top 3)
+  const top = results.slice(0, 3);
+  const order = [1, 0, 2]; // 2nd, 1st, 3rd positions visually
+  const medals = ['🥇','🥈','🥉'];
+  const podClasses = ['pod-2','pod-1','pod-3'];
+  const podEl = document.getElementById('podium');
+  podEl.innerHTML = '';
+
+  const podOrder = [top[1], top[0], top[2]].map((u, i) => {
+    if (!u) return '';
+    const orig = i === 0 ? 1 : i === 1 ? 0 : 2;
+    const pct = Math.round((u.correct / totalQ) * 100);
+    return `<div class="pod ${podClasses[i]}">
+      <div class="pod-avatar">${u.username[0].toUpperCase()}</div>
+      <div class="pod-name">${esc(u.username)}</div>
+      <div class="pod-score">${u.correct}/${totalQ}</div>
+      <div class="pod-bar"></div>
+    </div>`;
+  });
+  podEl.innerHTML = podOrder.join('');
+
+  // Full list
+  const medals2 = ['🥇','🥈','🥉'];
+  document.getElementById('result-list').innerHTML = results.map((u, i) => {
+    const pct = Math.round((u.correct / totalQ) * 100);
+    const isMe = u.username === S.user?.name;
+    return `<div class="result-row" style="${isMe ? 'border-color:var(--accent)' : ''}">
+      <span class="rr-rank">${medals2[i] || (i+1)}</span>
+      <span class="rr-name">${esc(u.username)}${isMe ? ' 👈' : ''}</span>
+      <span class="rr-score">${u.correct}/${totalQ}</span>
+      <span class="rr-pct">${pct}%</span>
+    </div>`;
+  }).join('');
+
+  setTimeout(() => {
+    S.screens = [];
+    showScreen('s-result');
+    // Natijaga qarab celebratsiya
+    if (pct === 100) {
+      spawnConfetti(120);
+      spawnFloaters(['🎉','🎊','⭐','🏆','✨','💯','🥳'], 10);
+      spawnStarBurst();
+      vibrate([60, 40, 60, 40, 100]);
+    } else if (pct >= 70) {
+      spawnConfetti(60);
+      spawnFloaters(['🎉','⭐','👏','🏅'], 6);
+      vibrate([50, 30, 80]);
+    } else if (pct >= 40) {
+      spawnConfetti(25);
+      spawnFloaters(['👏','💪'], 3);
+    }
+  }, 500);
+}
+
+// ── ANIMATIONS HELPERS ─────────────────────────────────────────────────────
+function animateCount(el, from, to, duration) {
+  if (!el) return;
+  const start = performance.now();
+  function tick(now) {
+    const t = Math.min(1, (now - start) / duration);
+    // ease-out cubic
+    const eased = 1 - Math.pow(1 - t, 3);
+    el.textContent = Math.round(from + (to - from) * eased);
+    if (t < 1) requestAnimationFrame(tick);
+    else el.textContent = to;
+  }
+  requestAnimationFrame(tick);
+}
+
+function spawnSparkles(target) {
+  if (!target) return;
+  const rect = target.getBoundingClientRect();
+  const cx = rect.left + rect.width / 2;
+  const cy = rect.top + rect.height / 2;
+  const count = 10;
+  for (let i = 0; i < count; i++) {
+    const sp = document.createElement('div');
+    sp.className = 'sparkle';
+    const angle = (Math.PI * 2 * i) / count + Math.random() * 0.3;
+    const dist = 60 + Math.random() * 50;
+    sp.style.left = (cx - 7) + 'px';
+    sp.style.top = (cy - 7) + 'px';
+    sp.style.setProperty('--tx', Math.cos(angle) * dist + 'px');
+    sp.style.setProperty('--ty', Math.sin(angle) * dist + 'px');
+    sp.style.animationDelay = (i * 0.02) + 's';
+    document.body.appendChild(sp);
+    setTimeout(() => sp.remove(), 1200);
+  }
+}
+
+function spawnFloaters(emojis, count = 6) {
+  for (let i = 0; i < count; i++) {
+    const el = document.createElement('div');
+    el.className = 'floater';
+    el.textContent = emojis[Math.floor(Math.random() * emojis.length)];
+    el.style.left = (Math.random() * 90 + 5) + '%';
+    el.style.animationDuration = (3 + Math.random() * 2) + 's';
+    el.style.animationDelay = (Math.random() * 0.5) + 's';
+    el.style.fontSize = (24 + Math.random() * 20) + 'px';
+    document.body.appendChild(el);
+    setTimeout(() => el.remove(), 6000);
+  }
+}
+
+function spawnStarBurst() {
+  const el = document.createElement('div');
+  el.className = 'star-burst';
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 900);
+}
+
+function vibrate(pattern) {
+  if (navigator.vibrate) {
+    try { navigator.vibrate(pattern); } catch (e) { /* ignore */ }
+  }
+}
+
+// "Qaytadan urinish" — oxirgi tanlangan testni qayta boshlash
+async function restartLastQuiz() {
+  const lq = S.lastQuiz;
+  if (!lq) { goHome(); return; }
+  S.quiz = lq;
+  document.getElementById('info-title').textContent = lq.title;
+  document.getElementById('info-q-count').textContent = lq.questionCount;
+  document.getElementById('info-time').textContent = lq.timeLimit;
+  // Quiz info ekranga o'tamiz va darhol boshlaymiz
+  S.screens = [];
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active', 'prev'));
+  document.getElementById('s-info')?.classList.add('active');
+  S.screens = ['s-home', 's-info'];
+  await startQuiz();
+}
+
+// ── CONFETTI ──────────────────────────────────────────────────────────────
+function spawnConfetti(count = 30) {
+  const wrap = document.createElement('div');
+  wrap.className = 'confetti-wrap';
+  document.body.appendChild(wrap);
+  const colors = ['#7c3aed','#a855f7','#10b981','#f59e0b','#ef4444','#60a5fa'];
+  for (let i = 0; i < count; i++) {
+    const cf = document.createElement('div');
+    cf.className = 'cf';
+    cf.style.cssText = `
+      left:${Math.random()*100}%;
+      background:${colors[~~(Math.random()*colors.length)]};
+      animation-duration:${.8+Math.random()*1.2}s;
+      animation-delay:${Math.random()*0.4}s;
+      width:${6+Math.random()*8}px;height:${6+Math.random()*8}px;
+      border-radius:${Math.random() > 0.5 ? '50%' : '2px'};
+    `;
+    wrap.appendChild(cf);
+  }
+  setTimeout(() => wrap.remove(), 3000);
+}
+
+// ── TOAST ─────────────────────────────────────────────────────────────────
+let toastTimer;
+function showToast(msg, type = '') {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = `toast show ${type}`;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 2800);
+}
+
+// ── API ───────────────────────────────────────────────────────────────────
+async function api(method, path, body) {
+  const opts = { method, headers: { 'Content-Type': 'application/json' } };
+  if (S.user?.token) opts.headers['x-user-token'] = S.user.token;
+  if (body) opts.body = JSON.stringify(body);
+  const res = await fetch(path, opts);
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.message || `Xatolik ${res.status}`);
+  return data;
+}
+
+function esc(s) {
+  if (!s) return '';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// Keyboard: Enter key
+document.getElementById('inp-name').addEventListener('keydown', e => {
+  if (e.key === 'Enter') document.getElementById('inp-phone').focus();
+});
+document.getElementById('inp-phone').addEventListener('keydown', e => {
+  if (e.key === 'Enter') doRegister();
+});
+
+// Search input — Enter / Escape
+document.getElementById('quiz-search')?.addEventListener('keydown', e => {
+  if (e.key === 'Escape') clearSearch();
+});
+
+// 1-4 raqamlar bilan javob tanlash (klaviatura yorliqlari)
+document.addEventListener('keydown', e => {
+  // Faqat quiz screen ochiq va javob hali berilmagan bo'lsa
+  const quizScreen = document.getElementById('s-quiz');
+  if (!quizScreen?.classList.contains('active') || S.answered) return;
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+  const map = { '1': 0, '2': 1, '3': 2, '4': 3, 'a': 0, 'b': 1, 'c': 2, 'd': 3, 'A': 0, 'B': 1, 'C': 2, 'D': 3 };
+  const idx = map[e.key];
+  if (idx !== undefined && S.currentQ && idx < S.currentQ.options.length) {
+    submitAnswer(idx);
+  }
+});
+</script>
+</body>
+</html>

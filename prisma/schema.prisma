@@ -1,0 +1,63 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Quiz {
+  id          Int        @id @default(autoincrement())
+  title       String
+  description String?
+  timeLimit   Int        @default(30)
+  shuffleQ    Boolean    @default(true)
+  shuffleA    Boolean    @default(true)
+  isActive    Boolean    @default(true)
+  createdAt   DateTime   @default(now())
+  questions   Question[]
+  sessions    Session[]
+}
+
+model Question {
+  id      Int     @id @default(autoincrement())
+  quizId  Int
+  quiz    Quiz    @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  text    String
+  options Json
+  correct Int
+  explain String?
+  order   Int     @default(0)
+}
+
+model Session {
+  id        Int      @id @default(autoincrement())
+  quizId    Int
+  quiz      Quiz     @relation(fields: [quizId], references: [id])
+  chatId    String
+  messageId Int?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  answers   Answer[]
+}
+
+model Answer {
+  id         Int      @id @default(autoincrement())
+  sessionId  Int
+  session    Session  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  userId     String
+  username   String?
+  questionId Int
+  chosen     Int
+  isCorrect  Boolean
+  answeredAt DateTime @default(now())
+}
+
+model WebUser {
+  id        Int      @id @default(autoincrement())
+  name      String
+  phone     String   @unique
+  token     String   @unique @default(cuid())
+  createdAt DateTime @default(now())
+}
