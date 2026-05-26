@@ -10,10 +10,24 @@ import { AdminModule } from './admin/admin.module';
 import { UserModule } from './user/user.module';
 import { SessionModule } from './session/session.module';
 
+function telegrafConfig() {
+  const token = process.env.TELEGRAM_BOT_TOKEN!;
+  const appUrl = process.env.APP_URL || '';
+  if (appUrl.startsWith('https://')) {
+    return {
+      token,
+      launchOptions: {
+        webhook: { domain: appUrl, hookPath: '/tg-hook' },
+      },
+    };
+  }
+  return { token };
+}
+
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
-    TelegrafModule.forRoot({ token: process.env.TELEGRAM_BOT_TOKEN, middlewares: [] }),
+    TelegrafModule.forRoot(telegrafConfig()),
     PrismaModule,
     EventsModule,
     BotModule,
