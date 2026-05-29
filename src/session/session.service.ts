@@ -1,6 +1,7 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, Inject, forwardRef } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { EventsService } from '../events/events.service';
+import { BotService } from '../bot/bot.service';
 
 interface SoloState {
   sessionId: number;
@@ -20,6 +21,7 @@ export class SessionService {
   constructor(
     private prisma: PrismaService,
     private events: EventsService,
+    @Inject(forwardRef(() => BotService)) private botService: BotService,
   ) {}
 
   async getActiveSessions() {
@@ -185,12 +187,19 @@ export class SessionService {
       const q = await this.prisma.question.findUnique({ where: { id: questionId } });
       if (!q) throw new NotFoundException('Savol topilmadi');
 
+      // For group sessions, the shuffled question state lives in BotService.
+      // We must compare against the SHUFFLED correct index (what the user actually saw),
+      // not q.correct from DB which is the original pre-shuffle index.
+      const groupActive = this.botService.getActiveQuiz(chatId);
+      const shuffledQ = groupActive?.questions.find((sq: any) => sq.id === questionId);
+      const correctIdx = shuffledQ ? shuffledQ.correct : q.correct;
+
       const existing = await this.prisma.answer.findFirst({
         where: { sessionId: session.id, questionId, userId },
       });
-      if (existing) return { alreadyAnswered: true, isCorrect: existing.isCorrect, correct: q.correct };
+      if (existing) return { alreadyAnswered: true, isCorrect: existing.isCorrect, correct: correctIdx };
 
-      const isCorrect = chosen === q.correct;
+      const isCorrect = chosen === correctIdx;
       await this.prisma.answer.create({
         data: { sessionId: session.id, userId, username, questionId, chosen, isCorrect },
       });
@@ -200,7 +209,7 @@ export class SessionService {
       });
       this.events.emit(chatId, 'answer_count', { questionId, count });
 
-      return { alreadyAnswered: false, isCorrect, correct: q.correct, explain: q.explain };
+      return { alreadyAnswered: false, isCorrect, correct: correctIdx, explain: q.explain };
     }
 
     // Solo session

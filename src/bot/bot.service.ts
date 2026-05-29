@@ -28,7 +28,7 @@ function escapeMd(s: string | null | undefined): string {
 @Injectable()
 export class BotService implements OnModuleInit {
   private activeQuizzes = new Map<string, ActiveQuiz>();
-  private pollMap = new Map<string, { chatId: string; questionId: number; sessionId: number }>();
+  private pollMap = new Map<string, { chatId: string; questionId: number; sessionId: number; correctIndex: number }>();
 
   constructor(
     private prisma: PrismaService,
@@ -107,7 +107,7 @@ export class BotService implements OnModuleInit {
       const pollId = pollMsg?.poll?.id;
       if (pollId) {
         active.currentPollId = pollId;
-        this.pollMap.set(pollId, { chatId, questionId: q.id, sessionId: active.sessionId });
+        this.pollMap.set(pollId, { chatId, questionId: q.id, sessionId: active.sessionId, correctIndex: q.correct });
       }
     } catch (e: any) {
       console.error('sendPoll error:', e.message);
@@ -137,10 +137,9 @@ export class BotService implements OnModuleInit {
     });
     if (existing) return;
 
-    const q = await this.prisma.question.findUnique({ where: { id: info.questionId } });
-    if (!q) return;
-
-    const isCorrect = chosen === q.correct;
+    // info.correctIndex is the SHUFFLED correct index (matches what user saw in the poll).
+    // Fetching q.correct from DB here would be the ORIGINAL pre-shuffle index — wrong.
+    const isCorrect = chosen === info.correctIndex;
     await this.prisma.answer.create({
       data: { sessionId: info.sessionId, userId, username, questionId: info.questionId, chosen, isCorrect },
     });
