@@ -60,6 +60,7 @@ export class BotService implements OnModuleInit {
 
     let questions = [...quiz.questions];
     if (quiz.shuffleQ) questions = this.shuffle(questions);
+    if (quiz.shuffleA) questions = questions.map(q => this.shuffleOptions(q));
 
     const session = await this.prisma.session.create({
       data: { quizId, chatId, isActive: true },
@@ -361,5 +362,17 @@ export class BotService implements OnModuleInit {
       [a[i], a[j]] = [a[j], a[i]];
     }
     return a;
+  }
+
+  private shuffleOptions(q: any): any {
+    const opts = (q.options as string[]) || [];
+    const indices = opts.map((_, i) => i);
+    for (let i = indices.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [indices[i], indices[j]] = [indices[j], indices[i]];
+    }
+    const newOptions = indices.map(i => opts[i]);
+    const newCorrect = indices.indexOf(q.correct);
+    return { ...q, options: newOptions, correct: newCorrect };
   }
 }
