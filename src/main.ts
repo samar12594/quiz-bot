@@ -2,8 +2,18 @@ import 'reflect-metadata';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { NestExpressApplication } from '@nestjs/platform-express';
+import { AllExceptionsFilter } from './common/all-exceptions.filter';
 import { join } from 'path';
 import { execSync } from 'child_process';
+
+// Ushlanmagan xatolar process'ni YIQITMASIN — bot uzluksiz ishlashi uchun
+// shunchaki loglaymiz. (Telegram API uzilishi, kutilmagan promise va h.k.)
+process.on('unhandledRejection', (reason: any) => {
+  console.error('⚠️ unhandledRejection:', reason?.stack || reason);
+});
+process.on('uncaughtException', (err: any) => {
+  console.error('⚠️ uncaughtException:', err?.stack || err);
+});
 
 // Port band bo'lsa, eski jarayonni avtomatik o'ldiramiz (dev rejimi)
 // Hot-reload paytida nodemon eski jarayonni to'liq yopib ulgurmasligi mumkin
@@ -36,6 +46,7 @@ async function bootstrap() {
       app = await NestFactory.create<NestExpressApplication>(AppModule);
       app.useStaticAssets(join(__dirname, '..', 'public'));
       app.enableCors();
+      app.useGlobalFilters(new AllExceptionsFilter());
       await app.listen(port);
       lastErr = null;
       break;

@@ -15,6 +15,11 @@ function checkAuth(secret: string) {
 export class QuizController {
   constructor(private quizService: QuizService) {}
 
+  @Get('health')
+  health() {
+    return this.quizService.health();
+  }
+
   @Get('quizzes')
   findAll() {
     return this.quizService.findAll();

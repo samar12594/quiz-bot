@@ -190,6 +190,16 @@ export class QuizService {
     return this.prisma.blokPreset.delete({ where: { id } });
   }
 
+  // Sog'liqni tekshirish — DB ulanishi tirikmi
+  async health() {
+    try {
+      await this.prisma.$queryRaw`SELECT 1`;
+      return { ok: true, db: 'up', time: new Date().toISOString() };
+    } catch (e: any) {
+      return { ok: false, db: 'down', error: e.message };
+    }
+  }
+
   private shuffleArr<T>(arr: T[]): T[] {
     const a = [...arr];
     for (let i = a.length - 1; i > 0; i--) {
