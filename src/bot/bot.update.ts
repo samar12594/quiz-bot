@@ -25,7 +25,8 @@ export class BotUpdate {
       `Salom! Test platformasiga xush kelibsiz.\n\n` +
       `📌 *Buyruqlar:*\n` +
       `/quiz — Testlar ro'yxati\n` +
-      `/blok — Blok test tuzish (bir nechta testdan)\n` +
+      `/blok — Blok test tuzish (fanlardan)\n` +
+      `/avtoblok — Tayyor avto blok testlar\n` +
       `/stop — Testni to'xtatish\n` +
       `/score — Joriy natija\n\n` +
       `🌐 Web ilova: ${appUrl}/app`,
@@ -34,7 +35,8 @@ export class BotUpdate {
         reply_markup: {
           keyboard: [
             [{ text: '📋 Testlar ro\'yxati' }, { text: '🧩 Blok test' }],
-            [{ text: '📊 Joriy natija' }, { text: '🛑 Testni to\'xtatish' }],
+            [{ text: '🤖 Avto blok' }, { text: '📊 Joriy natija' }],
+            [{ text: '🛑 Testni to\'xtatish' }],
           ],
           resize_keyboard: true,
         },
@@ -186,7 +188,7 @@ export class BotUpdate {
     await this.botService.handlePollAnswer(pa.poll_id, userId, username, chosen);
   }
 
-  // ─── BLOK TEST QURUVCHI ────────────────────────────────────────────────
+  // ─── BLOK TEST QURUVCHI (fan bo'yicha) ─────────────────────────────────
 
   @Command('blok')
   async onBlokCommand(@Ctx() ctx: Context) {
@@ -211,7 +213,7 @@ export class BotUpdate {
       return;
     }
     const builder = await this.botService.startBlokBuilder(chatId);
-    if (!builder.quizzes.length) {
+    if (!builder.subjects.length) {
       await ctx.reply("😕 Faol testlar yo'q. Avval test yarating yoki import qiling.");
       this.botService.cancelBlokBuilder(chatId);
       return;
@@ -220,19 +222,40 @@ export class BotUpdate {
     await ctx.reply(text, { parse_mode: 'Markdown', reply_markup: { inline_keyboard: keyboard } });
   }
 
-  // Test tanlash bosqichi ko'rinishi (checkbox ro'yxat)
+  private static PAGE = 6; // sahifadagi fanlar soni
+
+  // Fan tanlash bosqichi ko'rinishi (checkbox + pagination)
   private blokSelectView(b: any) {
+    const PAGE = BotUpdate.PAGE;
+    const pages = Math.max(1, Math.ceil(b.subjects.length / PAGE));
+    const page = Math.min(Math.max(0, b.page), pages - 1);
+    const start = page * PAGE;
+    const slice = b.subjects.slice(start, start + PAGE);
+
     const text =
       `🧩 *Blok test tuzish*\n\n` +
-      `Qaysi testlardan savol olamiz? Belgilang (✅), so'ng *Davom etish* ni bosing.\n` +
-      `Tanlangan: *${b.selected.length}* ta test`;
-    const keyboard = b.quizzes.map((q: any) => {
-      const on = b.selected.includes(q.id);
+      `Qaysi *fanlardan* savol olamiz? Belgilang (✅), so'ng *Davom etish* ni bosing.\n` +
+      `Tanlangan: *${b.selected.length}* fan` +
+      (pages > 1 ? `\nSahifa: *${page + 1}/${pages}*` : '');
+
+    const keyboard: any[] = slice.map((s: any, i: number) => {
+      const gi = start + i;
+      const on = b.selected.includes(s.key);
       return [{
-        text: `${on ? '✅' : '⬜️'} ${q.title} (${q.total})`,
-        callback_data: `blok_tgl_${q.id}`,
+        text: `${on ? '✅' : '⬜️'} ${s.label} (${s.total})`,
+        callback_data: `blok_tgl_${gi}`,
       }];
     });
+
+    // Pagination (1 2 3) qatori
+    if (pages > 1) {
+      const navRow: any[] = [];
+      for (let p = 0; p < pages; p++) {
+        navRow.push({ text: p === page ? `·${p + 1}·` : `${p + 1}`, callback_data: `blok_pg_${p}` });
+      }
+      keyboard.push(navRow);
+    }
+
     keyboard.push([
       { text: `▶️ Davom etish (${b.selected.length})`, callback_data: 'blok_go' },
       { text: '❌ Bekor', callback_data: 'blok_cancel' },
@@ -240,13 +263,25 @@ export class BotUpdate {
     return { text, keyboard };
   }
 
+  @Action(/^blok_pg_(\d+)$/)
+  async onBlokPage(@Ctx() ctx: any) {
+    const chatId = String(ctx.chat.id);
+    const b = this.botService.getBlokBuilder(chatId);
+    if (!b || b.step !== 'select') { await ctx.answerCbQuery('Eskirgan').catch(() => {}); return; }
+    this.botService.setBlokPage(chatId, parseInt(ctx.match[1]));
+    await ctx.answerCbQuery().catch(() => {});
+    const { text, keyboard } = this.blokSelectView(b);
+    await ctx.editMessageText(text, { parse_mode: 'Markdown', reply_markup: { inline_keyboard: keyboard } }).catch(() => {});
+  }
+
   @Action(/^blok_tgl_(\d+)$/)
   async onBlokToggle(@Ctx() ctx: any) {
     const chatId = String(ctx.chat.id);
-    const quizId = parseInt(ctx.match[1]);
     const b = this.botService.getBlokBuilder(chatId);
     if (!b || b.step !== 'select') { await ctx.answerCbQuery('Eskirgan').catch(() => {}); return; }
-    this.botService.toggleBlokQuiz(chatId, quizId);
+    const subj = b.subjects[parseInt(ctx.match[1])];
+    if (!subj) { await ctx.answerCbQuery().catch(() => {}); return; }
+    this.botService.toggleBlokSubject(chatId, subj.key);
     await ctx.answerCbQuery().catch(() => {});
     const { text, keyboard } = this.blokSelectView(b);
     await ctx.editMessageText(text, { parse_mode: 'Markdown', reply_markup: { inline_keyboard: keyboard } }).catch(() => {});
@@ -265,32 +300,32 @@ export class BotUpdate {
     const chatId = String(ctx.chat.id);
     const b = this.botService.getBlokBuilder(chatId);
     if (!b || b.step !== 'select') { await ctx.answerCbQuery('Eskirgan').catch(() => {}); return; }
-    if (!b.selected.length) { await ctx.answerCbQuery('Kamida bitta test tanlang!', { show_alert: true }).catch(() => {}); return; }
+    if (!b.selected.length) { await ctx.answerCbQuery('Kamida bitta fan tanlang!', { show_alert: true }).catch(() => {}); return; }
     this.botService.beginBlokCounts(chatId);
     await ctx.answerCbQuery().catch(() => {});
     await ctx.editMessageReplyMarkup(undefined).catch(() => {});
     await this.askBlokCount(ctx, chatId);
   }
 
-  // Joriy test uchun "nechta savol?" so'rovi
+  // Joriy fan uchun "nechta savol?" so'rovi
   private async askBlokCount(ctx: any, chatId: string) {
     const b = this.botService.getBlokBuilder(chatId);
     if (!b) return;
-    const q = this.botService.currentBlokCountQuiz(chatId);
-    if (!q) { await this.askBlokTime(ctx, chatId); return; }
+    const s = this.botService.currentBlokCountSubject(chatId);
+    if (!s) { await this.askBlokTime(ctx, chatId); return; }
 
-    const presets = [5, 10, 15, 20, 25, 30].filter(n => n < q.total);
+    const presets = [5, 10, 15, 20, 25, 30].filter(n => n < s.total);
     const rows: any[] = [];
     for (let i = 0; i < presets.length; i += 3) {
       rows.push(presets.slice(i, i + 3).map(n => ({ text: `${n}`, callback_data: `blok_cnt_${n}` })));
     }
-    rows.push([{ text: `📚 Hammasi (${q.total})`, callback_data: 'blok_cnt_-1' }]);
+    rows.push([{ text: `📚 Hammasi (${s.total})`, callback_data: 'blok_cnt_-1' }]);
     rows.push([{ text: '❌ Bekor', callback_data: 'blok_cancel' }]);
 
     await ctx.reply(
       `🧩 *Blok test* — ${b.countIdx + 1}/${b.selected.length}\n\n` +
-      `📚 *${escapeMd(q.title)}*\n` +
-      `Mavjud: *${q.total}* savol\n\n` +
+      `📚 *${escapeMd(s.label)}*\n` +
+      `Mavjud: *${s.total}* savol\n\n` +
       `Nechta savol olamiz? Tugmani bosing yoki son yozing:`,
       { parse_mode: 'Markdown', reply_markup: { inline_keyboard: rows } },
     );
@@ -301,13 +336,13 @@ export class BotUpdate {
     const chatId = String(ctx.chat.id);
     const b = this.botService.getBlokBuilder(chatId);
     if (!b || b.step !== 'count') { await ctx.answerCbQuery('Eskirgan').catch(() => {}); return; }
-    const q = this.botService.currentBlokCountQuiz(chatId);
-    if (!q) { await ctx.answerCbQuery().catch(() => {}); return; }
+    const s = this.botService.currentBlokCountSubject(chatId);
+    if (!s) { await ctx.answerCbQuery().catch(() => {}); return; }
 
     let n = parseInt(ctx.match[1]);
-    if (n === -1) n = q.total; // "Hammasi"
+    if (n === -1) n = s.total; // "Hammasi"
     await ctx.answerCbQuery().catch(() => {});
-    await ctx.editMessageText(`✅ *${escapeMd(q.title)}* — ${Math.min(n, q.total)} savol`, { parse_mode: 'Markdown' }).catch(() => {});
+    await ctx.editMessageText(`✅ *${escapeMd(s.label)}* — ${Math.min(n, s.total)} savol`, { parse_mode: 'Markdown' }).catch(() => {});
 
     const next = this.botService.setBlokCount(chatId, n);
     if (next === 'count') await this.askBlokCount(ctx, chatId);
@@ -343,7 +378,7 @@ export class BotUpdate {
   async onBlokTextInput(@Ctx() ctx: any) {
     const chatId = String(ctx.chat.id);
     const b = this.botService.getBlokBuilder(chatId);
-    if (!b) return; // blok jarayoni yo'q — e'tibor bermaymiz
+    if (!b || b.step === 'select') return; // jarayon yo'q yoki tanlash bosqichi — e'tibor bermaymiz
 
     const raw = (ctx.message?.text || '').trim();
     const n = parseInt(raw);
@@ -354,7 +389,6 @@ export class BotUpdate {
 
     if (b.step === 'count') {
       const next = this.botService.setBlokCount(chatId, n);
-      const q = this.botService.currentBlokCountQuiz(chatId);
       if (next === 'count') await this.askBlokCount(ctx, chatId);
       else if (next === 'time') await this.askBlokTime(ctx, chatId);
     } else if (b.step === 'time') {
@@ -376,6 +410,67 @@ export class BotUpdate {
       setTimeout(() => this.botService.sendQuestion(chatId), 2000);
     } catch (e: any) {
       this.botService.cancelBlokBuilder(chatId);
+      await ctx.reply(`❌ ${e.message}`);
+    }
+  }
+
+  // ─── AVTO BLOK (admin presetlari asosida) ──────────────────────────────
+
+  @Command('avtoblok')
+  async onAvtoBlokCommand(@Ctx() ctx: Context) {
+    await this.showPresets(ctx);
+  }
+
+  @Hears('🤖 Avto blok')
+  async onAvtoBlokKeyboard(@Ctx() ctx: Context) {
+    await this.showPresets(ctx);
+  }
+
+  private async showPresets(ctx: any) {
+    const chatId = String(ctx.chat.id);
+    if (this.botService.hasActiveQuiz(chatId)) {
+      await ctx.reply("⚠️ Allaqachon test davom etmoqda! Avval /stop yuboring.");
+      return;
+    }
+    const presets: any[] = await this.botService.listPresets();
+    if (!presets.length) {
+      await ctx.reply("😕 Hali avto blok preset yo'q. Admin panelda yarating (🧩 Blok test → Preset saqlash).");
+      return;
+    }
+    const kb = presets.map(p => {
+      const items = (p.items as any[]) || [];
+      const totalQ = items.reduce((sum, it) => sum + (it.count || 0), 0);
+      return [{
+        text: `🤖 ${p.name} — ${totalQ} savol · ${p.timeLimit}s`,
+        callback_data: `preset_run_${p.id}`,
+      }];
+    });
+    await ctx.reply('🤖 *Avto blok testlar:*\n\nBittasini tanlang — bot avtomatik tuzib beradi.',
+      { parse_mode: 'Markdown', reply_markup: { inline_keyboard: kb } });
+  }
+
+  @Action(/^preset_run_(\d+)$/)
+  async onPresetRun(@Ctx() ctx: any) {
+    const chatId = String(ctx.chat.id);
+    const presetId = parseInt(ctx.match[1]);
+    await ctx.answerCbQuery('🤖 Tuzilmoqda...').catch(() => {});
+
+    if (this.botService.hasActiveQuiz(chatId)) {
+      await ctx.reply('⚠️ Allaqachon test davom etmoqda! Avval /stop yuboring.');
+      return;
+    }
+
+    await ctx.reply('🤖 Avto blok test tayyorlanmoqda...');
+    try {
+      const { quiz, questions } = await this.botService.runPreset(chatId, presetId);
+      await ctx.reply(
+        `🎯 *${escapeMd(quiz.title)}*\n\n` +
+        `📊 Jami savollar: *${questions.length} ta*\n` +
+        `⏱ Har savol: *${quiz.timeLimit} soniya*`,
+        { parse_mode: 'Markdown' },
+      );
+      setTimeout(() => this.botService.sendQuestion(chatId), 2000);
+    } catch (e: any) {
       await ctx.reply(`❌ ${e.message}`);
     }
   }

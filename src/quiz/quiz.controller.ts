@@ -1,7 +1,8 @@
 import {
-  Controller, Get, Post, Put, Delete, Param, Body,
+  Controller, Get, Post, Put, Delete, Param, Body, Query, Res,
   Headers, UnauthorizedException, ParseIntPipe,
 } from '@nestjs/common';
+import type { Response } from 'express';
 import { QuizService } from './quiz.service';
 
 function checkAuth(secret: string) {
@@ -24,6 +25,25 @@ export class QuizController {
     return this.quizService.findActive();
   }
 
+  // Faol testlar fan bo'yicha guruhlangan holda (blok/preset uchun)
+  @Get('subjects')
+  getSubjects() {
+    return this.quizService.getSubjectGroups();
+  }
+
+  // Tanlangan testlarning savollarini CSV qilib yuklab beradi
+  @Get('export/csv')
+  async exportCsv(@Query('quizIds') quizIds: string, @Res() res: Response) {
+    const ids = (quizIds || '')
+      .split(',')
+      .map(s => parseInt(s.trim()))
+      .filter(n => !isNaN(n));
+    const { filename, csv } = await this.quizService.exportCsv(ids);
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.send('﻿' + csv); // BOM — Excel uchun UTF-8
+  }
+
   @Get('quizzes/:id')
   findOne(@Param('id', ParseIntPipe) id: number) {
     return this.quizService.findOne(id);
@@ -39,6 +59,27 @@ export class QuizController {
   createBlok(@Headers('x-admin-secret') secret: string, @Body() body: any) {
     checkAuth(secret);
     return this.quizService.createBlok(body);
+  }
+
+  // ─── Avto blok presetlari ───────────────────────────────────────────
+  @Get('presets')
+  findPresets() {
+    return this.quizService.findPresets();
+  }
+
+  @Post('presets')
+  createPreset(@Headers('x-admin-secret') secret: string, @Body() body: any) {
+    checkAuth(secret);
+    return this.quizService.createPreset(body);
+  }
+
+  @Delete('presets/:id')
+  removePreset(
+    @Headers('x-admin-secret') secret: string,
+    @Param('id', ParseIntPipe) id: number,
+  ) {
+    checkAuth(secret);
+    return this.quizService.removePreset(id);
   }
 
   @Put('quizzes/:id')

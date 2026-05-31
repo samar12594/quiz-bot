@@ -54,6 +54,20 @@ model Answer {
   answeredAt DateTime @default(now())
 }
 
+// Avto blok test uchun saqlangan shablon: admin qaysi fanlardan
+// qancha savol va qancha vaqt ekanligini belgilab qo'yadi, bot shu
+// asosda avtomatik aralashtirilgan test tuzadi.
+model BlokPreset {
+  id        Int      @id @default(autoincrement())
+  name      String
+  timeLimit Int      @default(30)
+  shuffleQ  Boolean  @default(true)
+  shuffleA  Boolean  @default(true)
+  // items: [{ label: string, quizIds: number[], count: number }]
+  items     Json
+  createdAt DateTime @default(now())
+}
+
 model WebUser {
   id        Int      @id @default(autoincrement())
   name      String

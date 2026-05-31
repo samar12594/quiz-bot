@@ -18,13 +18,15 @@ interface ActiveQuiz {
   isBlok?: boolean;
 }
 
-// Blok test quruvchi - foydalanuvchi bir nechta testdan savollarni
+// Blok test quruvchi - foydalanuvchi bir nechta FANdan savollarni
 // birlashtirib yangi test yaratadigan ko'p bosqichli holat.
+export interface BlokSubject { key: string; label: string; quizIds: number[]; total: number }
 export interface BlokBuilder {
   step: 'select' | 'count' | 'time';
-  quizzes: { id: number; title: string; total: number }[];
-  selected: number[];
-  counts: Record<number, number>;
+  subjects: BlokSubject[];
+  page: number;
+  selected: string[];               // tanlangan fan kalitlari (key)
+  counts: Record<string, number>;   // key -> savollar soni
   countIdx: number;
   timeLimit?: number;
 }
@@ -56,6 +58,7 @@ export class BotService implements OnModuleInit {
         { command: 'start', description: "Botni ishga tushirish" },
         { command: 'quiz', description: "Testlar ro'yxati" },
         { command: 'blok', description: "Blok test tuzish" },
+        { command: 'avtoblok', description: "Tayyor avto blok testlar" },
         { command: 'stop', description: "Testni to'xtatish" },
         { command: 'score', description: 'Joriy natija' },
       ]);
@@ -70,14 +73,11 @@ export class BotService implements OnModuleInit {
   // ─── Blok test quruvchi ───────────────────────────────────────────────
 
   async startBlokBuilder(chatId: string): Promise<BlokBuilder> {
-    const quizzes = await this.quizService.findActive();
+    const subjects = await this.quizService.getSubjectGroups();
     const builder: BlokBuilder = {
       step: 'select',
-      quizzes: quizzes.map((q: any) => ({
-        id: q.id,
-        title: q.title,
-        total: q._count?.questions ?? 0,
-      })),
+      subjects,
+      page: 0,
       selected: [],
       counts: {},
       countIdx: 0,
@@ -89,31 +89,35 @@ export class BotService implements OnModuleInit {
   getBlokBuilder(chatId: string) { return this.blokBuilders.get(chatId); }
   cancelBlokBuilder(chatId: string) { this.blokBuilders.delete(chatId); }
 
-  toggleBlokQuiz(chatId: string, quizId: number): BlokBuilder | undefined {
+  setBlokPage(chatId: string, page: number) {
+    const b = this.blokBuilders.get(chatId);
+    if (b) b.page = page;
+  }
+
+  toggleBlokSubject(chatId: string, key: string): BlokBuilder | undefined {
     const b = this.blokBuilders.get(chatId);
     if (!b) return undefined;
-    const i = b.selected.indexOf(quizId);
+    const i = b.selected.indexOf(key);
     if (i >= 0) b.selected.splice(i, 1);
-    else b.selected.push(quizId);
+    else b.selected.push(key);
     return b;
   }
 
-  // Tanlangan testdan keyingisini qaytaradi yoki barchasi tanlangan bo'lsa null.
-  currentBlokCountQuiz(chatId: string): { id: number; title: string; total: number } | null {
+  // Joriy (count bosqichidagi) fanni qaytaradi yoki barchasi bo'lsa null.
+  currentBlokCountSubject(chatId: string): BlokSubject | null {
     const b = this.blokBuilders.get(chatId);
     if (!b) return null;
-    const id = b.selected[b.countIdx];
-    return b.quizzes.find(q => q.id === id) || null;
+    const key = b.selected[b.countIdx];
+    return b.subjects.find(s => s.key === key) || null;
   }
 
-  // Joriy test uchun savollar sonini saqlaydi; keyingi bosqichni belgilaydi.
-  // Qaytaradi: 'count' (yana savol bor), 'time' (endi vaqt so'ralsin).
+  // Joriy fan uchun savollar sonini saqlaydi; keyingi bosqichni belgilaydi.
   setBlokCount(chatId: string, count: number): 'count' | 'time' | null {
     const b = this.blokBuilders.get(chatId);
     if (!b || b.step !== 'count') return null;
-    const q = b.quizzes.find(x => x.id === b.selected[b.countIdx]);
-    if (!q) return null;
-    b.counts[q.id] = Math.max(1, Math.min(count, q.total));
+    const s = b.subjects.find(x => x.key === b.selected[b.countIdx]);
+    if (!s) return null;
+    b.counts[s.key] = Math.max(1, Math.min(count, s.total));
     b.countIdx++;
     if (b.countIdx >= b.selected.length) {
       b.step = 'time';
@@ -176,11 +180,12 @@ export class BotService implements OnModuleInit {
     const b = this.blokBuilders.get(chatId);
     if (!b || !b.selected.length) throw new Error('Blok test sozlanmadi');
 
-    const sources = b.selected.map(id => ({ quizId: id, count: b.counts[id] ?? 0 }));
-    const titles = b.selected
-      .map(id => b.quizzes.find(q => q.id === id)?.title)
-      .filter(Boolean) as string[];
-    let title = '🧩 Blok: ' + titles.join(' + ');
+    const chosen = b.selected
+      .map(key => b.subjects.find(s => s.key === key))
+      .filter(Boolean) as BlokSubject[];
+
+    const sources = chosen.map(s => ({ quizIds: s.quizIds, count: b.counts[s.key] ?? 0 }));
+    let title = '🧩 Blok: ' + chosen.map(s => s.label).join(' + ');
     if (title.length > 90) title = title.slice(0, 89) + '…';
 
     const quiz = await this.quizService.createBlok({
@@ -194,7 +199,37 @@ export class BotService implements OnModuleInit {
 
     this.blokBuilders.delete(chatId);
 
-    if (!quiz.questions?.length) throw new Error("Tanlangan testlarda savollar yo'q!");
+    if (!quiz.questions?.length) throw new Error("Tanlangan fanlarda savollar yo'q!");
+    return this.launchQuiz(chatId, quiz, true);
+  }
+
+  // ─── Avto blok: admin saqlagan preset asosida darhol test tuzadi ──────
+
+  async listPresets() {
+    return this.quizService.findPresets();
+  }
+
+  async runPreset(chatId: string, presetId: number) {
+    const preset: any = await this.quizService.findPreset(presetId);
+    const items = (preset.items as any[]) || [];
+    const sources = items
+      .map(it => ({ quizIds: it.quizIds || [], count: it.count || 0 }))
+      .filter(s => s.quizIds.length && s.count > 0);
+    if (!sources.length) throw new Error('Bu presetda fanlar yo\'q');
+
+    let title = `🤖 ${preset.name}`;
+    if (title.length > 90) title = title.slice(0, 89) + '…';
+
+    const quiz = await this.quizService.createBlok({
+      title,
+      timeLimit: preset.timeLimit ?? 30,
+      shuffleQ: preset.shuffleQ ?? true,
+      shuffleA: preset.shuffleA ?? true,
+      isActive: false,
+      sources,
+    });
+
+    if (!quiz.questions?.length) throw new Error("Presetdagi fanlarda savollar yo'q!");
     return this.launchQuiz(chatId, quiz, true);
   }
 

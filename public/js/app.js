@@ -773,87 +773,148 @@ async function loadStats() {
     `<h3 style="margin:20px 0 8px">📋 Sessiyalar tarixi (${stats.length})</h3>` + sessionsHtml;
 }
 
-// ── BLOK TEST ─────────────────────────────────────────────────────────────────
-let _blokQuizzes = [];
-let _blokSel = {}; // quizId -> tanlangan savollar soni
+// ── BLOK TEST (fan bo'yicha) ────────────────────────────────────────────────
+let _blokSubjects = [];     // /api/subjects dan: [{key,label,quizIds,total,parts}]
+let _blokSel = {};          // key -> tanlangan savollar soni
+let _blokPage = 0;
+const BLOK_PAGE = 8;        // sahifadagi fanlar soni
 
 async function loadBlokSources() {
   try {
-    _blokQuizzes = await req('GET', '/api/quizzes/active');
+    _blokSubjects = await req('GET', '/api/subjects');
+    _blokPage = 0;
     renderBlokSources();
+    loadPresets();
   } catch (e) { toast(e.message, 'error'); }
 }
 
-function blokTotal(q) { return q._count?.questions ?? 0; }
+function blokFilteredSubjects() {
+  const search = (document.getElementById('blok-search')?.value || '').toLowerCase().trim();
+  let list = _blokSubjects.filter(s => s.total > 0);
+  if (search) list = list.filter(s => s.label.toLowerCase().includes(search));
+  return list;
+}
+
+function onBlokSearch() { _blokPage = 0; renderBlokSources(); }
 
 function renderBlokSources() {
   const el = document.getElementById('blok-source-list');
   if (!el) return;
-  const search = (document.getElementById('blok-search')?.value || '').toLowerCase().trim();
 
-  let list = _blokQuizzes.filter(q => blokTotal(q) > 0);
-  if (search) list = list.filter(q => q.title.toLowerCase().includes(search));
-
+  const list = blokFilteredSubjects();
   if (!list.length) {
-    el.innerHTML = `<div class="empty-state"><div class="icon">🔍</div><p>Savolli faol test topilmadi</p></div>`;
+    el.innerHTML = `<div class="empty-state"><div class="icon">🔍</div><p>Fan topilmadi</p></div>`;
+    document.getElementById('blok-pagination').innerHTML = '';
     updateBlokSummary();
     return;
   }
 
-  el.innerHTML = list.map(q => {
-    const total = blokTotal(q);
-    const on = _blokSel[q.id] != null;
-    const cnt = on ? _blokSel[q.id] : '';
+  const pages = Math.max(1, Math.ceil(list.length / BLOK_PAGE));
+  if (_blokPage >= pages) _blokPage = pages - 1;
+  const start = _blokPage * BLOK_PAGE;
+  const slice = list.slice(start, start + BLOK_PAGE);
+
+  el.innerHTML = slice.map(s => {
+    const gi = _blokSubjects.indexOf(s); // barqaror global indeks (key/apostrof muammosidan qochish)
+    const on = _blokSel[s.key] != null;
+    const cnt = on ? _blokSel[s.key] : Math.min(20, s.total);
+    const idsCsv = s.quizIds.join(',');
     return `
       <div class="blok-row ${on ? 'on' : ''}">
-        <label class="blok-check">
-          <input type="checkbox" ${on ? 'checked' : ''} onchange="toggleBlokSource(${q.id}, ${total})" />
-          <span class="blok-row-title">${esc(q.title)}</span>
-          <span class="blok-row-total">${total} savol</span>
-        </label>
-        <div class="blok-count-wrap ${on ? '' : 'hidden'}">
-          <span>olamiz:</span>
-          <input type="number" class="blok-count-input" min="1" max="${total}" value="${cnt}"
-            oninput="setBlokSourceCount(${q.id}, this.value, ${total})" />
-          <button type="button" class="blok-all-btn" onclick="setBlokSourceCount(${q.id}, ${total}, ${total}); renderBlokSources()">Hammasi</button>
+        <div class="blok-row-head">
+          <label class="blok-check">
+            <input type="checkbox" ${on ? 'checked' : ''} onchange="toggleBlokSubject(${gi})" />
+            <span class="blok-row-title">${esc(s.label)}</span>
+            <span class="blok-row-total">${s.total} savol · ${s.parts} bo'lak</span>
+          </label>
+          <button type="button" class="blok-all-btn" title="Shu fan savollarini CSV yuklab olish"
+            onclick="downloadSubjectCsv('${idsCsv}')">⬇️ CSV</button>
+        </div>
+        <div class="blok-slider-wrap ${on ? '' : 'hidden'}">
+          <input type="range" class="blok-slider" min="1" max="${s.total}" value="${cnt}"
+            oninput="setBlokSubjectCount(${gi}, this.value, this)" />
+          <input type="number" class="blok-count-input" min="1" max="${s.total}" value="${cnt}"
+            oninput="setBlokSubjectCount(${gi}, this.value, this)" />
+          <button type="button" class="blok-all-btn" onclick="setBlokSubjectCount(${gi}, ${s.total}); renderBlokSources()">Hammasi</button>
         </div>
       </div>
     `;
   }).join('');
+
+  // Pagination (1 2 3)
+  const pg = document.getElementById('blok-pagination');
+  if (pages > 1) {
+    let html = '';
+    for (let p = 0; p < pages; p++) {
+      html += `<button class="blok-page-btn ${p === _blokPage ? 'active' : ''}" onclick="gotoBlokPage(${p})">${p + 1}</button>`;
+    }
+    pg.innerHTML = html;
+  } else {
+    pg.innerHTML = '';
+  }
+
   updateBlokSummary();
 }
 
-function toggleBlokSource(id, total) {
-  if (_blokSel[id] != null) {
-    delete _blokSel[id];
-  } else {
-    _blokSel[id] = Math.min(10, total); // default
-  }
+function gotoBlokPage(p) { _blokPage = p; renderBlokSources(); }
+
+function toggleBlokSubject(gi) {
+  const s = _blokSubjects[gi];
+  if (!s) return;
+  if (_blokSel[s.key] != null) delete _blokSel[s.key];
+  else _blokSel[s.key] = Math.min(20, s.total);
   renderBlokSources();
 }
 
-function setBlokSourceCount(id, val, total) {
+// el berilsa (slider yoki number input), butun row qayta chizilmay,
+// faqat juftlik (slider <-> number) sinxronlanadi — slayder silliq ishlashi uchun.
+function setBlokSubjectCount(gi, val, el) {
+  const s = _blokSubjects[gi];
+  if (!s) return;
   let n = parseInt(val);
-  if (isNaN(n)) { _blokSel[id] = ''; updateBlokSummary(); return; }
-  n = Math.max(1, Math.min(n, total));
-  _blokSel[id] = n;
+  if (isNaN(n)) n = 1;
+  n = Math.max(1, Math.min(n, s.total));
+  _blokSel[s.key] = n;
+  if (el) {
+    const row = el.closest('.blok-row');
+    if (row) {
+      const slider = row.querySelector('.blok-slider');
+      const num = row.querySelector('.blok-count-input');
+      if (slider && slider !== el) slider.value = n;
+      if (num && num !== el) num.value = n;
+    }
+  }
   updateBlokSummary();
 }
 
 function updateBlokSummary() {
   const el = document.getElementById('blok-summary');
   if (!el) return;
-  const ids = Object.keys(_blokSel);
-  const totalQ = ids.reduce((s, id) => s + (parseInt(_blokSel[id]) || 0), 0);
-  if (!ids.length) {
-    el.innerHTML = `<div class="blok-sum-empty">Hali test tanlanmadi</div>`;
+  const keys = Object.keys(_blokSel);
+  const totalQ = keys.reduce((s, k) => s + (parseInt(_blokSel[k]) || 0), 0);
+  if (!keys.length) {
+    el.innerHTML = `<div class="blok-sum-empty">Hali fan tanlanmadi</div>`;
     return;
   }
   el.innerHTML = `
     <div class="blok-sum-box">
-      <div><b>${ids.length}</b> ta test tanlandi</div>
+      <div><b>${keys.length}</b> ta fan tanlandi</div>
       <div>Jami: <b>${totalQ}</b> ta savol blok testga kiradi</div>
     </div>`;
+}
+
+function downloadSubjectCsv(idsCsv) {
+  if (!idsCsv) { toast('Test topilmadi', 'error'); return; }
+  window.open(`/api/export/csv?quizIds=${encodeURIComponent(idsCsv)}`, '_blank');
+}
+
+// Tanlangan fanlardan manba ro'yxati tuzadi
+function blokSelectedSources() {
+  return Object.keys(_blokSel).map(key => {
+    const subj = _blokSubjects.find(s => s.key === key);
+    if (!subj) return null;
+    return { label: subj.label, quizIds: subj.quizIds, count: parseInt(_blokSel[key]) || 0 };
+  }).filter(s => s && s.count > 0);
 }
 
 async function createBlokTest() {
@@ -865,11 +926,8 @@ async function createBlokTest() {
   if (!title) { toast('Blok test nomini kiriting!', 'error'); return; }
   if (!timeLimit || timeLimit < 5) { toast('Vaqt limiti kamida 5 soniya', 'error'); return; }
 
-  const sources = Object.keys(_blokSel)
-    .map(id => ({ quizId: parseInt(id), count: parseInt(_blokSel[id]) || 0 }))
-    .filter(s => s.count > 0);
-
-  if (!sources.length) { toast('Kamida bitta testdan savol tanlang!', 'error'); return; }
+  const sources = blokSelectedSources().map(s => ({ quizIds: s.quizIds, count: s.count }));
+  if (!sources.length) { toast('Kamida bitta fandan savol tanlang!', 'error'); return; }
 
   const btn = document.getElementById('btn-create-blok');
   btn.disabled = true;
@@ -877,11 +935,9 @@ async function createBlokTest() {
   try {
     const quiz = await req('POST', '/api/quizzes/blok', { title, timeLimit, shuffleQ, shuffleA, sources });
     toast(`✅ "${quiz.title}" yaratildi (${quiz.questions?.length || 0} savol)`, 'success');
-    // Tozalash
     _blokSel = {};
     document.getElementById('blok-title').value = '';
     document.getElementById('blok-search').value = '';
-    renderBlokSources();
     showPage('dashboard');
   } catch (e) {
     toast(e.message, 'error');
@@ -889,6 +945,72 @@ async function createBlokTest() {
     btn.disabled = false;
     btn.textContent = '✅ Blok test yaratish';
   }
+}
+
+async function savePreset() {
+  const name = document.getElementById('blok-title').value.trim();
+  const timeLimit = parseInt(document.getElementById('blok-time').value);
+  const shuffleQ = document.getElementById('blok-shuffle-q').value === 'true';
+  const shuffleA = document.getElementById('blok-shuffle-a').value === 'true';
+
+  if (!name) { toast('Preset nomini kiriting (yuqoridagi nom maydoni)!', 'error'); return; }
+  if (!timeLimit || timeLimit < 5) { toast('Vaqt limiti kamida 5 soniya', 'error'); return; }
+
+  const items = blokSelectedSources();
+  if (!items.length) { toast('Kamida bitta fandan savol tanlang!', 'error'); return; }
+
+  const btn = document.getElementById('btn-save-preset');
+  btn.disabled = true;
+  btn.textContent = 'Saqlanmoqda...';
+  try {
+    await req('POST', '/api/presets', { name, timeLimit, shuffleQ, shuffleA, items });
+    toast(`💾 "${name}" preset saqlandi — botda /avtoblok orqali ishlatiladi`, 'success');
+    loadPresets();
+  } catch (e) {
+    toast(e.message, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '💾 Avto blok preset saqlash';
+  }
+}
+
+let _presets = [];
+async function loadPresets() {
+  const el = document.getElementById('preset-list');
+  if (!el) return;
+  try {
+    _presets = await req('GET', '/api/presets');
+    if (!_presets.length) {
+      el.innerHTML = `<p style="color:var(--text-muted);text-align:center;padding:16px">Hali preset yo'q</p>`;
+      return;
+    }
+    el.innerHTML = _presets.map(p => {
+      const items = p.items || [];
+      const totalQ = items.reduce((s, it) => s + (it.count || 0), 0);
+      const fanlar = items.map(it => `${esc(it.label)} (${it.count})`).join(', ');
+      return `
+        <div class="preset-row">
+          <div class="preset-info">
+            <div class="preset-name">🤖 ${esc(p.name)}</div>
+            <div class="preset-meta">${totalQ} savol · ⏱ ${p.timeLimit}s · ${items.length} fan</div>
+            <div class="preset-fanlar">${fanlar}</div>
+          </div>
+          <button class="btn-danger btn-sm" onclick="deletePreset(${p.id})" title="O'chirish">🗑️</button>
+        </div>`;
+    }).join('');
+  } catch (e) { toast(e.message, 'error'); }
+}
+
+function deletePreset(id) {
+  const p = _presets.find(x => x.id === id);
+  const name = p ? p.name : 'Preset';
+  confirm('🗑️', "Presetni o'chirish", `"${name}" presetini o'chirmoqchimisiz?`, async () => {
+    try {
+      await req('DELETE', `/api/presets/${id}`);
+      toast('Preset o\'chirildi', 'success');
+      loadPresets();
+    } catch (e) { toast(e.message, 'error'); }
+  });
 }
 
 // ── SEND TO GROUP ─────────────────────────────────────────────────────────────

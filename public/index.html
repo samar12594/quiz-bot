@@ -151,13 +151,13 @@
       <div id="page-blok" class="page hidden">
         <h2>🧩 Blok test yaratish</h2>
         <p style="color:var(--text-muted);margin:-8px 0 16px">
-          Bir nechta mavjud testni tanlab, har biridan kerakli miqdorda savol olib,
-          ulardan aralashtirilgan yangi <b>blok test</b> tuziladi.
+          Fanlarni tanlab, har biridan slayder bilan nechta savol olishni belgilang —
+          fanning barcha bo'laklaridan <b>tasodifiy</b> savollar aralashtirilib yangi blok test tuziladi.
         </p>
 
         <div class="card">
           <div class="form-group">
-            <label>Blok test nomi <span style="color:var(--danger)">*</span></label>
+            <label>Blok test / preset nomi <span style="color:var(--danger)">*</span></label>
             <input type="text" id="blok-title" placeholder="Masalan: Yakuniy blok imtihon" />
           </div>
           <div class="form-row">
@@ -183,16 +183,26 @@
         </div>
 
         <div class="card">
-          <h3 style="margin-top:0">📚 Testlarni tanlang</h3>
+          <h3 style="margin-top:0">📚 Fanlarni tanlang</h3>
           <div class="search-wrap" style="margin-bottom:12px">
-            <input type="text" id="blok-search" class="search-input" placeholder="Test nomi bo'yicha izlash..." oninput="renderBlokSources()" />
+            <input type="text" id="blok-search" class="search-input" placeholder="Fan nomi bo'yicha izlash..." oninput="onBlokSearch()" />
           </div>
           <div id="blok-summary" class="blok-summary"></div>
           <div id="blok-source-list" class="blok-source-list"></div>
+          <div id="blok-pagination" class="blok-pagination"></div>
         </div>
 
         <div class="btn-row">
           <button onclick="createBlokTest()" class="btn-primary" id="btn-create-blok">✅ Blok test yaratish</button>
+          <button onclick="savePreset()" class="btn-secondary" id="btn-save-preset">💾 Avto blok preset saqlash</button>
+        </div>
+
+        <div class="card">
+          <h3 style="margin-top:0">🤖 Saqlangan avto blok presetlar</h3>
+          <p style="color:var(--text-muted);font-size:13px;margin:-6px 0 12px">
+            Bu presetlarni botda <b>/avtoblok</b> orqali bir tugma bilan ishga tushirish mumkin.
+          </p>
+          <div id="preset-list"></div>
         </div>
       </div>
 

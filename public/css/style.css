@@ -610,3 +610,29 @@ details.stats-session summary::-webkit-details-marker { display: none; }
 details.stats-session summary::before { content: '▸'; margin-right: 8px; transition: transform .15s; }
 details.stats-session[open] summary::before { transform: rotate(90deg); }
 details.stats-session[open] summary { margin-bottom: 12px; }
+
+/* ── BLOK (fan + slider + pagination + preset) ─────────────── */
+.blok-row { flex-direction: column; align-items: stretch; gap: 10px; }
+.blok-row-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.blok-slider-wrap { display: flex; align-items: center; gap: 10px; padding-left: 28px; }
+.blok-slider { flex: 1; accent-color: var(--primary); height: 4px; cursor: pointer; }
+.blok-slider-wrap .blok-count-input { width: 70px; }
+
+.blok-pagination { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; margin-top: 14px; }
+.blok-page-btn {
+  min-width: 34px; padding: 6px 10px; background: var(--glass-hover);
+  border: 1px solid var(--glass-border); border-radius: var(--radius-sm);
+  color: var(--text); font-size: 13px; cursor: pointer;
+}
+.blok-page-btn:hover { border-color: var(--primary); }
+.blok-page-btn.active { background: var(--primary); color: #fff; border-color: var(--primary); font-weight: 700; }
+
+.preset-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  background: var(--glass-hover); border: 1px solid var(--glass-border);
+  border-radius: var(--radius-sm); padding: 12px 14px; margin-bottom: 8px;
+}
+.preset-info { flex: 1; min-width: 0; }
+.preset-name { font-weight: 700; color: var(--text); }
+.preset-meta { font-size: 12px; color: var(--primary); margin-top: 2px; }
+.preset-fanlar { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
