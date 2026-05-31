@@ -59,6 +59,8 @@ export class BotService implements OnModuleInit {
         { command: 'quiz', description: "Testlar ro'yxati" },
         { command: 'blok', description: "Blok test tuzish" },
         { command: 'avtoblok', description: "Tayyor avto blok testlar" },
+        { command: 'reyting', description: "Umumiy reyting" },
+        { command: 'natijalarim', description: "Mening natijalarim" },
         { command: 'stop', description: "Testni to'xtatish" },
         { command: 'score', description: 'Joriy natija' },
       ]);
@@ -456,6 +458,7 @@ export class BotService implements OnModuleInit {
       reply_markup: {
         inline_keyboard: [
           firstRow,
+          [{ text: '❌ Xatolar ustida ishlash', callback_data: `mistakes_${active.sessionId}` }],
           secondRow,
         ],
       },

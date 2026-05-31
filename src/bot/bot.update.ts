@@ -27,6 +27,8 @@ export class BotUpdate {
       `/quiz — Testlar ro'yxati\n` +
       `/blok — Blok test tuzish (fanlardan)\n` +
       `/avtoblok — Tayyor avto blok testlar\n` +
+      `/reyting — Umumiy reyting\n` +
+      `/natijalarim — Mening natijalarim\n` +
       `/stop — Testni to'xtatish\n` +
       `/score — Joriy natija\n\n` +
       `🌐 Web ilova: ${appUrl}/app`,
@@ -36,6 +38,7 @@ export class BotUpdate {
           keyboard: [
             [{ text: '📋 Testlar ro\'yxati' }, { text: '🧩 Blok test' }],
             [{ text: '🤖 Avto blok' }, { text: '📊 Joriy natija' }],
+            [{ text: '🏆 Reyting' }, { text: '📈 Natijalarim' }],
             [{ text: '🛑 Testni to\'xtatish' }],
           ],
           resize_keyboard: true,
@@ -506,6 +509,70 @@ export class BotUpdate {
       setTimeout(() => this.botService.sendQuestion(chatId), 2000);
     } catch (e: any) {
       await ctx.reply(`❌ ${e.message}`);
+    }
+  }
+
+  // ─── REYTING / NATIJALARIM / XATOLAR ───────────────────────────────────
+
+  @Command('reyting')
+  async onReytingCommand(@Ctx() ctx: Context) { await this.showReyting(ctx); }
+
+  @Hears('🏆 Reyting')
+  async onReytingKeyboard(@Ctx() ctx: Context) { await this.showReyting(ctx); }
+
+  private async showReyting(ctx: any) {
+    const board = await this.quizService.getGlobalLeaderboard(15);
+    if (!board.length) { await ctx.reply('😕 Hali natijalar yo\'q.'); return; }
+    const medals = ['🥇', '🥈', '🥉'];
+    let text = `🏆 *Umumiy reyting*\n━━━━━━━━━━━━━━━━\n`;
+    board.forEach((u: any, i: number) => {
+      const rank = medals[i] || `${i + 1}.`;
+      text += `${rank} @${escapeMd(u.username)} — *${u.correct}* ✅ (${u.pct}%)\n`;
+    });
+    text += `\n_Barcha testlar bo'yicha to'g'ri javoblar soni_`;
+    await ctx.reply(text, { parse_mode: 'Markdown' });
+  }
+
+  @Command('natijalarim')
+  async onMyResultsCommand(@Ctx() ctx: Context) { await this.showMyResults(ctx); }
+
+  @Hears('📈 Natijalarim')
+  async onMyResultsKeyboard(@Ctx() ctx: Context) { await this.showMyResults(ctx); }
+
+  private async showMyResults(ctx: any) {
+    const userId = String(ctx.from?.id || '');
+    const history = await this.quizService.getUserHistory(userId, 10);
+    if (!history.length) { await ctx.reply('😕 Sizda hali natijalar yo\'q. /quiz orqali test yeching!'); return; }
+    let text = `📈 *Mening natijalarim*\n━━━━━━━━━━━━━━━━\n`;
+    for (const h of history) {
+      const d = new Date(h.date).toLocaleDateString('uz');
+      text += `📚 ${escapeMd(h.title)}\n   *${h.correct}/${h.total}* (${h.pct}%) · ${d}\n`;
+    }
+    await ctx.reply(text, { parse_mode: 'Markdown' });
+  }
+
+  @Action(/^mistakes_(\d+)$/)
+  async onMistakes(@Ctx() ctx: any) {
+    const sessionId = parseInt(ctx.match[1]);
+    const userId = String(ctx.from?.id || '');
+    await ctx.answerCbQuery().catch(() => {});
+    const mistakes = await this.quizService.getSessionMistakes(sessionId, userId);
+    if (!mistakes.length) {
+      await ctx.reply('🎉 Bu testda xatoyingiz yo\'q — barakalla!');
+      return;
+    }
+    let text = `❌ *Xatolar ustida ishlash* (${mistakes.length} ta)\n━━━━━━━━━━━━━━━━\n`;
+    mistakes.forEach((m: any, i: number) => {
+      text += `\n*${i + 1}.* ${escapeMd(m.text)}\n✅ To'g'ri javob: *${escapeMd(m.correctText)}*\n`;
+      if (m.explain) text += `💡 _${escapeMd(m.explain)}_\n`;
+    });
+    // Telegram xabar uzunligi cheklovi (~4096) — bo'lib yuboramiz
+    if (text.length <= 4000) {
+      await ctx.reply(text, { parse_mode: 'Markdown' });
+    } else {
+      for (let i = 0; i < text.length; i += 4000) {
+        await ctx.reply(text.slice(i, i + 4000), { parse_mode: 'Markdown' }).catch(() => {});
+      }
     }
   }
 }

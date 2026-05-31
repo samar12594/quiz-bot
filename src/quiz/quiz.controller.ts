@@ -134,4 +134,22 @@ export class QuizController {
   getStats(@Param('id', ParseIntPipe) id: number) {
     return this.quizService.getStats(id);
   }
+
+  @Get('quizzes/:id/question-stats')
+  getQuestionStats(@Param('id', ParseIntPipe) id: number) {
+    return this.quizService.getQuestionStats(id);
+  }
+
+  @Get('leaderboard')
+  leaderboard() {
+    return this.quizService.getGlobalLeaderboard();
+  }
+
+  @Get('quizzes/:id/results-csv')
+  async resultsCsv(@Param('id', ParseIntPipe) id: number, @Res() res: Response) {
+    const { filename, csv } = await this.quizService.exportResultsCsv(id);
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.send('﻿' + csv);
+  }
 }

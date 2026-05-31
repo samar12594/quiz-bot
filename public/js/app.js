@@ -105,6 +105,7 @@ function showPage(name) {
   if (name === 'dashboard') loadDashboard();
   if (name === 'stats') loadStatsQuizList();
   if (name === 'blok') loadBlokSources();
+  if (name === 'leaderboard') loadLeaderboard();
   // Sidebar'dan "Test yaratish" bosilganda — toza forma
   if (name === 'create-quiz' && !window._openingExisting) newQuizForm();
 }
@@ -680,9 +681,17 @@ async function loadStatsQuizList() {
     quizzes.map(q => `<option value="${q.id}">${esc(q.title)}</option>`).join('');
 }
 
+let _statsQuizId = null;
 async function loadStats() {
   const id = document.getElementById('stats-quiz-id').value;
-  if (!id) { document.getElementById('stats-content').innerHTML = ''; return; }
+  const csvBtn = document.getElementById('btn-results-csv');
+  if (!id) {
+    document.getElementById('stats-content').innerHTML = '';
+    if (csvBtn) csvBtn.classList.add('hidden');
+    return;
+  }
+  _statsQuizId = id;
+  if (csvBtn) csvBtn.classList.remove('hidden');
 
   const stats = await req('GET', `/api/quizzes/${id}/stats`);
   const el = document.getElementById('stats-content');
@@ -770,7 +779,66 @@ async function loadStats() {
   `).join('');
 
   el.innerHTML = summary + overallBoard +
+    `<div id="question-stats"></div>` +
     `<h3 style="margin:20px 0 8px">📋 Sessiyalar tarixi (${stats.length})</h3>` + sessionsHtml;
+
+  loadQuestionStats(id);
+}
+
+// Har bir savol bo'yicha qiyinchilik (qaysi savolga ko'p xato qilingan)
+async function loadQuestionStats(id) {
+  const el = document.getElementById('question-stats');
+  if (!el) return;
+  try {
+    const qs = await req('GET', `/api/quizzes/${id}/question-stats`);
+    const answered = qs.filter(q => q.total > 0);
+    if (!answered.length) { el.innerHTML = ''; return; }
+    // Eng qiyinlari (past foiz) yuqorida
+    const sorted = answered.slice().sort((a, b) => (a.pct ?? 0) - (b.pct ?? 0));
+    el.innerHTML = `
+      <h3 style="margin:20px 0 8px">🧠 Savollar qiyinligi <span style="font-weight:400;color:var(--text-muted)">(eng qiyini yuqorida)</span></h3>
+      <div class="card">
+        ${sorted.map(q => {
+          const pct = q.pct ?? 0;
+          const cls = pct >= 70 ? 'qd-ok' : pct >= 40 ? 'qd-mid' : 'qd-hard';
+          return `
+            <div class="qdiff-row">
+              <div class="qdiff-text">${q.order}. ${esc(q.text)}</div>
+              <div class="qdiff-bar"><div class="qdiff-fill ${cls}" style="width:${pct}%"></div></div>
+              <div class="qdiff-pct">${pct}% <span>(${q.correct}/${q.total})</span></div>
+            </div>`;
+        }).join('')}
+      </div>`;
+  } catch (e) { el.innerHTML = ''; }
+}
+
+function downloadResultsCsv() {
+  if (!_statsQuizId) return;
+  window.open(`/api/quizzes/${_statsQuizId}/results-csv`, '_blank');
+}
+
+async function loadLeaderboard() {
+  const el = document.getElementById('leaderboard-content');
+  if (!el) return;
+  el.innerHTML = '<p style="color:var(--text-muted);text-align:center;padding:20px">Yuklanmoqda...</p>';
+  try {
+    const board = await req('GET', '/api/leaderboard');
+    if (!board.length) {
+      el.innerHTML = '<p style="color:var(--text-muted);text-align:center;padding:20px">Hali natijalar yo\'q</p>';
+      return;
+    }
+    const medals = ['🥇', '🥈', '🥉'];
+    el.innerHTML = `
+      <ul class="leaderboard">
+        ${board.map((u, i) => `
+          <li>
+            <span class="rank">${medals[i] || (i + 1) + '.'}</span>
+            <span class="name">@${esc(u.username)}</span>
+            <span class="score">${u.correct} ✅ · ${u.pct}% · ${u.sessions} test</span>
+          </li>
+        `).join('')}
+      </ul>`;
+  } catch (e) { toast(e.message, 'error'); }
 }
 
 // ── BLOK TEST (fan bo'yicha) ────────────────────────────────────────────────

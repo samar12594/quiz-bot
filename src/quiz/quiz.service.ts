@@ -276,4 +276,122 @@ export class QuizService {
       };
     });
   }
+
+  // Global reyting — barcha testlar bo'ylab foydalanuvchilar (username bo'yicha)
+  async getGlobalLeaderboard(limit = 50) {
+    const answers = await this.prisma.answer.findMany({
+      select: { userId: true, username: true, isCorrect: true, sessionId: true },
+    });
+    const byUser: Record<string, { username: string; correct: number; total: number; sessions: Set<number> }> = {};
+    for (const a of answers) {
+      const key = a.username || a.userId;
+      if (!byUser[key]) byUser[key] = { username: key, correct: 0, total: 0, sessions: new Set() };
+      byUser[key].total++;
+      byUser[key].sessions.add(a.sessionId);
+      if (a.isCorrect) byUser[key].correct++;
+    }
+    return Object.values(byUser)
+      .map(u => ({
+        username: u.username,
+        correct: u.correct,
+        total: u.total,
+        sessions: u.sessions.size,
+        pct: u.total ? Math.round((u.correct / u.total) * 100) : 0,
+      }))
+      .sort((a, b) => b.correct - a.correct || b.pct - a.pct)
+      .slice(0, limit);
+  }
+
+  // Har bir savol bo'yicha qiyinchilik — necha marta javob berilgan va necha % to'g'ri
+  async getQuestionStats(quizId: number) {
+    const quiz = await this.findOne(quizId);
+    const sessions = await this.prisma.session.findMany({ where: { quizId }, select: { id: true } });
+    const ids = sessions.map(s => s.id);
+    const answers = ids.length
+      ? await this.prisma.answer.findMany({ where: { sessionId: { in: ids } }, select: { questionId: true, isCorrect: true } })
+      : [];
+    const agg: Record<number, { total: number; correct: number }> = {};
+    for (const a of answers) {
+      if (!agg[a.questionId]) agg[a.questionId] = { total: 0, correct: 0 };
+      agg[a.questionId].total++;
+      if (a.isCorrect) agg[a.questionId].correct++;
+    }
+    return quiz.questions.map((q, i) => {
+      const s = agg[q.id] || { total: 0, correct: 0 };
+      return {
+        order: i + 1,
+        questionId: q.id,
+        text: q.text,
+        total: s.total,
+        correct: s.correct,
+        pct: s.total ? Math.round((s.correct / s.total) * 100) : null,
+      };
+    });
+  }
+
+  // Foydalanuvchining o'tgan natijalari (oxirgi sessiyalar bo'yicha)
+  async getUserHistory(userId: string, limit = 10) {
+    const answers = await this.prisma.answer.findMany({
+      where: { userId },
+      select: { sessionId: true, isCorrect: true },
+    });
+    if (!answers.length) return [];
+    const bySession: Record<number, { correct: number; total: number }> = {};
+    for (const a of answers) {
+      if (!bySession[a.sessionId]) bySession[a.sessionId] = { correct: 0, total: 0 };
+      bySession[a.sessionId].total++;
+      if (a.isCorrect) bySession[a.sessionId].correct++;
+    }
+    const sessionIds = Object.keys(bySession).map(Number);
+    const sessions = await this.prisma.session.findMany({
+      where: { id: { in: sessionIds } },
+      include: { quiz: { select: { title: true } } },
+      orderBy: { createdAt: 'desc' },
+    });
+    return sessions.slice(0, limit).map(s => ({
+      sessionId: s.id,
+      title: s.quiz.title,
+      date: s.createdAt,
+      correct: bySession[s.id].correct,
+      total: bySession[s.id].total,
+      pct: bySession[s.id].total ? Math.round((bySession[s.id].correct / bySession[s.id].total) * 100) : 0,
+    }));
+  }
+
+  // Foydalanuvchi shu sessiyada xato qilgan savollar (ustida ishlash uchun)
+  async getSessionMistakes(sessionId: number, userId: string) {
+    const wrong = await this.prisma.answer.findMany({
+      where: { sessionId, userId, isCorrect: false },
+      select: { questionId: true },
+    });
+    if (!wrong.length) return [];
+    const qids = wrong.map(w => w.questionId);
+    const questions = await this.prisma.question.findMany({ where: { id: { in: qids } } });
+    return questions.map(q => {
+      const opts = (q.options as string[]) || [];
+      return {
+        text: q.text,
+        correctText: opts[q.correct] || '',
+        explain: q.explain || null,
+      };
+    });
+  }
+
+  // Test natijalarini CSV ga eksport (Excel ham ochadi)
+  async exportResultsCsv(quizId: number): Promise<{ filename: string; csv: string }> {
+    const stats = await this.getStats(quizId);
+    const esc = (v: any) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+    const rows: string[] = ['sessiya_sana,ishtirokchi,togri,jami,foiz'];
+    let title = 'natijalar';
+    for (const s of stats) {
+      title = s.quizTitle || title;
+      const date = new Date(s.createdAt).toISOString().slice(0, 16).replace('T', ' ');
+      for (const p of s.participants) {
+        const pct = s.totalQuestions ? Math.round((p.correct / s.totalQuestions) * 100) : 0;
+        rows.push([esc(date), esc(p.username), p.correct, s.totalQuestions, pct].join(','));
+      }
+    }
+    const safe = title.replace(/[^\p{L}\p{N}]+/gu, '_').slice(0, 50) || 'natijalar';
+    return { filename: `${safe}_natijalar.csv`, csv: rows.join('\n') };
+  }
 }

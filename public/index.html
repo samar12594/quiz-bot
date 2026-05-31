@@ -27,6 +27,7 @@
         <li><a href="#" onclick="showPage('blok')" id="nav-blok">🧩 Blok test</a></li>
         <li><a href="#" onclick="showPage('import')" id="nav-import">📂 CSV Import</a></li>
         <li><a href="#" onclick="showPage('stats')" id="nav-stats">📈 Natijalar</a></li>
+        <li><a href="#" onclick="showPage('leaderboard')" id="nav-leaderboard">🏆 Reyting</a></li>
       </ul>
       <div class="sidebar-footer">
         <button onclick="toggleTheme()" class="theme-toggle" id="theme-toggle-btn" title="Mavzu (kunduz/tun)">
@@ -277,8 +278,18 @@
           <select id="stats-quiz-id" onchange="loadStats()">
             <option value="">— Tanlang —</option>
           </select>
+          <button id="btn-results-csv" class="btn-secondary hidden" style="margin-top:10px" onclick="downloadResultsCsv()">⬇️ Natijalarni CSV (Excel)</button>
         </div>
         <div id="stats-content"></div>
+      </div>
+
+      <!-- LEADERBOARD -->
+      <div id="page-leaderboard" class="page hidden">
+        <h2>🏆 Umumiy reyting</h2>
+        <p style="color:var(--text-muted);margin:-8px 0 16px">
+          Barcha testlar bo'yicha eng ko'p to'g'ri javob bergan foydalanuvchilar.
+        </p>
+        <div class="card" id="leaderboard-content"></div>
       </div>
     </main>
   </div>
