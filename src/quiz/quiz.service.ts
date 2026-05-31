@@ -43,6 +43,69 @@ export class QuizService {
     return this.prisma.quiz.update({ where: { id }, data });
   }
 
+  // Blok test: bir nechta mavjud testdan tanlangan miqdorda savollarni
+  // nusxalab yangi test yaratadi. Savollar manba testdan random tanlanadi,
+  // shu sababli har bir blok turlicha chiqadi.
+  async createBlok(data: {
+    title: string;
+    description?: string;
+    timeLimit?: number;
+    shuffleQ?: boolean;
+    shuffleA?: boolean;
+    isActive?: boolean;
+    sources: { quizId: number; count: number }[];
+  }) {
+    if (!data.sources?.length) {
+      throw new NotFoundException('Kamida bitta manba test tanlang');
+    }
+
+    const quiz = await this.prisma.quiz.create({
+      data: {
+        title: data.title,
+        description: data.description ?? null,
+        timeLimit: data.timeLimit ?? 30,
+        shuffleQ: data.shuffleQ ?? true,
+        shuffleA: data.shuffleA ?? true,
+        isActive: data.isActive ?? true,
+      },
+    });
+
+    let order = 0;
+    const toCreate: any[] = [];
+    for (const src of data.sources) {
+      if (!src.count || src.count < 1) continue;
+      const pool = await this.prisma.question.findMany({
+        where: { quizId: src.quizId },
+      });
+      const picked = this.shuffleArr(pool).slice(0, src.count);
+      for (const q of picked) {
+        toCreate.push({
+          quizId: quiz.id,
+          text: q.text,
+          options: q.options as any,
+          correct: q.correct,
+          explain: q.explain,
+          order: order++,
+        });
+      }
+    }
+
+    if (toCreate.length) {
+      await this.prisma.question.createMany({ data: toCreate });
+    }
+
+    return this.findOne(quiz.id);
+  }
+
+  private shuffleArr<T>(arr: T[]): T[] {
+    const a = [...arr];
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+  }
+
   async remove(id: number) {
     const sessions = await this.prisma.session.findMany({
       where: { quizId: id },

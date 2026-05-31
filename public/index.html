@@ -24,6 +24,7 @@
       <ul>
         <li><a href="#" onclick="showPage('dashboard')" id="nav-dashboard" class="active">📊 Dashboard</a></li>
         <li><a href="#" onclick="showPage('create-quiz')" id="nav-create-quiz">➕ Test yaratish</a></li>
+        <li><a href="#" onclick="showPage('blok')" id="nav-blok">🧩 Blok test</a></li>
         <li><a href="#" onclick="showPage('import')" id="nav-import">📂 CSV Import</a></li>
         <li><a href="#" onclick="showPage('stats')" id="nav-stats">📈 Natijalar</a></li>
       </ul>
@@ -143,6 +144,55 @@
           </div>
 
           <div id="questions-preview" class="questions-list"></div>
+        </div>
+      </div>
+
+      <!-- BLOK TEST -->
+      <div id="page-blok" class="page hidden">
+        <h2>🧩 Blok test yaratish</h2>
+        <p style="color:var(--text-muted);margin:-8px 0 16px">
+          Bir nechta mavjud testni tanlab, har biridan kerakli miqdorda savol olib,
+          ulardan aralashtirilgan yangi <b>blok test</b> tuziladi.
+        </p>
+
+        <div class="card">
+          <div class="form-group">
+            <label>Blok test nomi <span style="color:var(--danger)">*</span></label>
+            <input type="text" id="blok-title" placeholder="Masalan: Yakuniy blok imtihon" />
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>⏱ Har savolga vaqt (soniya)</label>
+              <input type="number" id="blok-time" value="30" min="5" max="300" />
+            </div>
+            <div class="form-group">
+              <label>🔀 Savollarni aralashtirish</label>
+              <select id="blok-shuffle-q">
+                <option value="true">Ha</option>
+                <option value="false">Yo'q</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>🎲 Javoblarni aralashtirish</label>
+              <select id="blok-shuffle-a">
+                <option value="true">Ha</option>
+                <option value="false">Yo'q</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3 style="margin-top:0">📚 Testlarni tanlang</h3>
+          <div class="search-wrap" style="margin-bottom:12px">
+            <input type="text" id="blok-search" class="search-input" placeholder="Test nomi bo'yicha izlash..." oninput="renderBlokSources()" />
+          </div>
+          <div id="blok-summary" class="blok-summary"></div>
+          <div id="blok-source-list" class="blok-source-list"></div>
+        </div>
+
+        <div class="btn-row">
+          <button onclick="createBlokTest()" class="btn-primary" id="btn-create-blok">✅ Blok test yaratish</button>
         </div>
       </div>
 

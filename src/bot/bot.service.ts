@@ -15,6 +15,18 @@ interface ActiveQuiz {
   timeLimit: number;
   currentPollId?: string;
   nextTimer?: NodeJS.Timeout;
+  isBlok?: boolean;
+}
+
+// Blok test quruvchi - foydalanuvchi bir nechta testdan savollarni
+// birlashtirib yangi test yaratadigan ko'p bosqichli holat.
+export interface BlokBuilder {
+  step: 'select' | 'count' | 'time';
+  quizzes: { id: number; title: string; total: number }[];
+  selected: number[];
+  counts: Record<number, number>;
+  countIdx: number;
+  timeLimit?: number;
 }
 
 // Telegram Markdown (v1) special characters that need escaping inside text
@@ -29,6 +41,7 @@ function escapeMd(s: string | null | undefined): string {
 export class BotService implements OnModuleInit {
   private activeQuizzes = new Map<string, ActiveQuiz>();
   private pollMap = new Map<string, { chatId: string; questionId: number; sessionId: number; correctIndex: number }>();
+  private blokBuilders = new Map<string, BlokBuilder>();
 
   constructor(
     private prisma: PrismaService,
@@ -42,6 +55,7 @@ export class BotService implements OnModuleInit {
       await this.bot.telegram.setMyCommands([
         { command: 'start', description: "Botni ishga tushirish" },
         { command: 'quiz', description: "Testlar ro'yxati" },
+        { command: 'blok', description: "Blok test tuzish" },
         { command: 'stop', description: "Testni to'xtatish" },
         { command: 'score', description: 'Joriy natija' },
       ]);
@@ -53,30 +67,135 @@ export class BotService implements OnModuleInit {
   hasActiveQuiz(chatId: string) { return this.activeQuizzes.has(chatId); }
   getActiveQuiz(chatId: string) { return this.activeQuizzes.get(chatId); }
 
+  // ─── Blok test quruvchi ───────────────────────────────────────────────
+
+  async startBlokBuilder(chatId: string): Promise<BlokBuilder> {
+    const quizzes = await this.quizService.findActive();
+    const builder: BlokBuilder = {
+      step: 'select',
+      quizzes: quizzes.map((q: any) => ({
+        id: q.id,
+        title: q.title,
+        total: q._count?.questions ?? 0,
+      })),
+      selected: [],
+      counts: {},
+      countIdx: 0,
+    };
+    this.blokBuilders.set(chatId, builder);
+    return builder;
+  }
+
+  getBlokBuilder(chatId: string) { return this.blokBuilders.get(chatId); }
+  cancelBlokBuilder(chatId: string) { this.blokBuilders.delete(chatId); }
+
+  toggleBlokQuiz(chatId: string, quizId: number): BlokBuilder | undefined {
+    const b = this.blokBuilders.get(chatId);
+    if (!b) return undefined;
+    const i = b.selected.indexOf(quizId);
+    if (i >= 0) b.selected.splice(i, 1);
+    else b.selected.push(quizId);
+    return b;
+  }
+
+  // Tanlangan testdan keyingisini qaytaradi yoki barchasi tanlangan bo'lsa null.
+  currentBlokCountQuiz(chatId: string): { id: number; title: string; total: number } | null {
+    const b = this.blokBuilders.get(chatId);
+    if (!b) return null;
+    const id = b.selected[b.countIdx];
+    return b.quizzes.find(q => q.id === id) || null;
+  }
+
+  // Joriy test uchun savollar sonini saqlaydi; keyingi bosqichni belgilaydi.
+  // Qaytaradi: 'count' (yana savol bor), 'time' (endi vaqt so'ralsin).
+  setBlokCount(chatId: string, count: number): 'count' | 'time' | null {
+    const b = this.blokBuilders.get(chatId);
+    if (!b || b.step !== 'count') return null;
+    const q = b.quizzes.find(x => x.id === b.selected[b.countIdx]);
+    if (!q) return null;
+    b.counts[q.id] = Math.max(1, Math.min(count, q.total));
+    b.countIdx++;
+    if (b.countIdx >= b.selected.length) {
+      b.step = 'time';
+      return 'time';
+    }
+    return 'count';
+  }
+
+  beginBlokCounts(chatId: string): boolean {
+    const b = this.blokBuilders.get(chatId);
+    if (!b || b.selected.length === 0) return false;
+    b.step = 'count';
+    b.countIdx = 0;
+    return true;
+  }
+
+  setBlokTime(chatId: string, seconds: number) {
+    const b = this.blokBuilders.get(chatId);
+    if (!b) return;
+    b.timeLimit = Math.max(5, seconds);
+  }
+
   async startQuiz(chatId: string, quizId: number) {
     const quiz = await this.quizService.findOne(quizId);
     if (!quiz?.isActive) throw new Error('Test topilmadi yoki faol emas');
     if (!quiz.questions?.length) throw new Error("Bu testda savollar yo'q!");
+    return this.launchQuiz(chatId, quiz, false);
+  }
 
+  // Tayyor quiz (savollari bilan) obyektidan testni xotirada ishga tushiradi.
+  // startQuiz va blok test (finalizeBlok) shu metodga tayanadi.
+  private async launchQuiz(chatId: string, quiz: any, isBlok: boolean) {
     let questions = [...quiz.questions];
     if (quiz.shuffleQ) questions = this.shuffle(questions);
     if (quiz.shuffleA) questions = questions.map(q => this.shuffleOptions(q));
 
     const session = await this.prisma.session.create({
-      data: { quizId, chatId, isActive: true },
+      data: { quizId: quiz.id, chatId, isActive: true },
     });
 
     this.activeQuizzes.set(chatId, {
       sessionId: session.id,
-      quizId,
+      quizId: quiz.id,
       quizTitle: quiz.title,
       questions,
       currentIndex: 0,
       startTime: new Date(),
       timeLimit: Math.max(5, quiz.timeLimit),
+      isBlok,
     });
 
     return { session, quiz, questions };
+  }
+
+  // Blok-builder yakunlanganda: tanlangan testlardan savollarni nusxalab
+  // yashirin (isActive:false) yangi quiz yaratadi va uni darhol ishga tushiradi.
+  // Yashirin — chunki bu shaxsiy/bir martalik blok, umumiy testlar ro'yxatini
+  // to'ldirmasligi kerak, lekin natijalari adminda ko'rinadi.
+  async finalizeBlok(chatId: string) {
+    const b = this.blokBuilders.get(chatId);
+    if (!b || !b.selected.length) throw new Error('Blok test sozlanmadi');
+
+    const sources = b.selected.map(id => ({ quizId: id, count: b.counts[id] ?? 0 }));
+    const titles = b.selected
+      .map(id => b.quizzes.find(q => q.id === id)?.title)
+      .filter(Boolean) as string[];
+    let title = '🧩 Blok: ' + titles.join(' + ');
+    if (title.length > 90) title = title.slice(0, 89) + '…';
+
+    const quiz = await this.quizService.createBlok({
+      title,
+      timeLimit: b.timeLimit ?? 30,
+      shuffleQ: true,
+      shuffleA: true,
+      isActive: false,
+      sources,
+    });
+
+    this.blokBuilders.delete(chatId);
+
+    if (!quiz.questions?.length) throw new Error("Tanlangan testlarda savollar yo'q!");
+    return this.launchQuiz(chatId, quiz, true);
   }
 
   async sendQuestion(chatId: string) {
@@ -280,11 +399,17 @@ export class BotService implements OnModuleInit {
       secondRow.push({ text: '🌐 Web ilova', url: `${appUrl}/app` });
     }
 
+    // Blok test yashirin quiz ustida ishlaydi — uni qayta boshlab bo'lmaydi,
+    // shuning uchun "Yangi blok test" tugmasini ko'rsatamiz.
+    const firstRow = active.isBlok
+      ? [{ text: '🧩 Yangi blok test', callback_data: 'blok_new' }]
+      : [{ text: '🔄 Qaytadan urinish', callback_data: `restart_${quizId}` }];
+
     await this.bot.telegram.sendMessage(chatId, result, {
       parse_mode: 'Markdown',
       reply_markup: {
         inline_keyboard: [
-          [{ text: '🔄 Qaytadan urinish', callback_data: `restart_${quizId}` }],
+          firstRow,
           secondRow,
         ],
       },

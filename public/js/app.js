@@ -104,6 +104,7 @@ function showPage(name) {
 
   if (name === 'dashboard') loadDashboard();
   if (name === 'stats') loadStatsQuizList();
+  if (name === 'blok') loadBlokSources();
   // Sidebar'dan "Test yaratish" bosilganda — toza forma
   if (name === 'create-quiz' && !window._openingExisting) newQuizForm();
 }
@@ -681,7 +682,7 @@ async function loadStatsQuizList() {
 
 async function loadStats() {
   const id = document.getElementById('stats-quiz-id').value;
-  if (!id) return;
+  if (!id) { document.getElementById('stats-content').innerHTML = ''; return; }
 
   const stats = await req('GET', `/api/quizzes/${id}/stats`);
   const el = document.getElementById('stats-content');
@@ -691,13 +692,69 @@ async function loadStats() {
     return;
   }
 
+  const totalQuestions = stats[0].totalQuestions || 0;
+
+  // ── Umumiy xulosa + barcha sessiyalar bo'ylab birlashgan reyting ──
+  // Har bir foydalanuvchining (username bo'yicha) ENG YAXSHI natijasini olamiz.
+  const best = {}; // username -> {correct, total, sessions}
+  let totalParticipations = 0;
+  let perfectCount = 0;
+  let sumPct = 0;
+  let pctCount = 0;
+
+  stats.forEach(s => {
+    s.participants.forEach(p => {
+      totalParticipations++;
+      const pct = s.totalQuestions ? p.correct / s.totalQuestions : 0;
+      sumPct += pct; pctCount++;
+      if (pct === 1) perfectCount++;
+      const cur = best[p.username];
+      if (!cur || p.correct > cur.correct) {
+        best[p.username] = { username: p.username, correct: p.correct, total: s.totalQuestions };
+      }
+    });
+  });
+
+  const board = Object.values(best).sort((a, b) => b.correct - a.correct);
+  const avgPct = pctCount ? Math.round((sumPct / pctCount) * 100) : 0;
+  const bestPct = board.length && board[0].total ? Math.round((board[0].correct / board[0].total) * 100) : 0;
+  const finished = stats.filter(s => !s.isActive).length;
+
   const medals = ['🥇', '🥈', '🥉'];
-  el.innerHTML = stats.map(s => `
+
+  const summary = `
+    <div class="stats-summary">
+      <div class="stat-card"><div class="sc-val">${stats.length}</div><div class="sc-lbl">Sessiya</div></div>
+      <div class="stat-card"><div class="sc-val">${board.length}</div><div class="sc-lbl">Ishtirokchi</div></div>
+      <div class="stat-card"><div class="sc-val">${totalParticipations}</div><div class="sc-lbl">Urinish</div></div>
+      <div class="stat-card"><div class="sc-val">${bestPct}%</div><div class="sc-lbl">Eng yuqori</div></div>
+      <div class="stat-card"><div class="sc-val">${avgPct}%</div><div class="sc-lbl">O'rtacha</div></div>
+      <div class="stat-card"><div class="sc-val">${perfectCount}</div><div class="sc-lbl">💎 Mukammal</div></div>
+    </div>`;
+
+  const overallBoard = `
     <div class="stats-session">
-      <h4>
-        📅 ${new Date(s.createdAt).toLocaleString('uz')} | Chat: ${s.chatId}
+      <h4>🏆 Umumiy reyting <span style="font-weight:400;color:var(--text-muted)">(har kishining eng yaxshi natijasi · ${totalQuestions} savoldan)</span></h4>
+      <ul class="leaderboard">
+        ${board.slice(0, 50).map((p, i) => `
+          <li>
+            <span class="rank">${medals[i] || (i + 1) + '.'}</span>
+            <span class="name">@${esc(p.username)}</span>
+            <span class="score">${p.correct}/${p.total || totalQuestions} (${p.total ? Math.round(p.correct/p.total*100) : 0}%)</span>
+          </li>
+        `).join('')}
+      </ul>
+      ${board.length > 50 ? `<p style="color:var(--text-muted);text-align:center;margin-top:8px">... va yana ${board.length - 50} ishtirokchi</p>` : ''}
+    </div>`;
+
+  // ── Har bir sessiya bo'yicha batafsil (yig'iladigan) ──
+  const sessionsHtml = stats.map((s, si) => `
+    <details class="stats-session" ${si === 0 ? 'open' : ''}>
+      <summary>
+        📅 ${new Date(s.createdAt).toLocaleString('uz')}
         <span class="badge ${s.isActive ? 'badge-active' : 'badge-inactive'}" style="margin-left:8px">${s.isActive ? 'Davom etmoqda' : 'Tugallangan'}</span>
-      </h4>
+        <span style="color:var(--text-muted);font-weight:400;margin-left:8px">👥 ${s.participants.length}</span>
+      </summary>
       ${s.participants.length ? `
         <ul class="leaderboard">
           ${s.participants.map((p, i) => `
@@ -709,8 +766,129 @@ async function loadStats() {
           `).join('')}
         </ul>
       ` : '<p style="color:var(--text-muted)">Ishtirokchilar yo\'q</p>'}
-    </div>
+    </details>
   `).join('');
+
+  el.innerHTML = summary + overallBoard +
+    `<h3 style="margin:20px 0 8px">📋 Sessiyalar tarixi (${stats.length})</h3>` + sessionsHtml;
+}
+
+// ── BLOK TEST ─────────────────────────────────────────────────────────────────
+let _blokQuizzes = [];
+let _blokSel = {}; // quizId -> tanlangan savollar soni
+
+async function loadBlokSources() {
+  try {
+    _blokQuizzes = await req('GET', '/api/quizzes/active');
+    renderBlokSources();
+  } catch (e) { toast(e.message, 'error'); }
+}
+
+function blokTotal(q) { return q._count?.questions ?? 0; }
+
+function renderBlokSources() {
+  const el = document.getElementById('blok-source-list');
+  if (!el) return;
+  const search = (document.getElementById('blok-search')?.value || '').toLowerCase().trim();
+
+  let list = _blokQuizzes.filter(q => blokTotal(q) > 0);
+  if (search) list = list.filter(q => q.title.toLowerCase().includes(search));
+
+  if (!list.length) {
+    el.innerHTML = `<div class="empty-state"><div class="icon">🔍</div><p>Savolli faol test topilmadi</p></div>`;
+    updateBlokSummary();
+    return;
+  }
+
+  el.innerHTML = list.map(q => {
+    const total = blokTotal(q);
+    const on = _blokSel[q.id] != null;
+    const cnt = on ? _blokSel[q.id] : '';
+    return `
+      <div class="blok-row ${on ? 'on' : ''}">
+        <label class="blok-check">
+          <input type="checkbox" ${on ? 'checked' : ''} onchange="toggleBlokSource(${q.id}, ${total})" />
+          <span class="blok-row-title">${esc(q.title)}</span>
+          <span class="blok-row-total">${total} savol</span>
+        </label>
+        <div class="blok-count-wrap ${on ? '' : 'hidden'}">
+          <span>olamiz:</span>
+          <input type="number" class="blok-count-input" min="1" max="${total}" value="${cnt}"
+            oninput="setBlokSourceCount(${q.id}, this.value, ${total})" />
+          <button type="button" class="blok-all-btn" onclick="setBlokSourceCount(${q.id}, ${total}, ${total}); renderBlokSources()">Hammasi</button>
+        </div>
+      </div>
+    `;
+  }).join('');
+  updateBlokSummary();
+}
+
+function toggleBlokSource(id, total) {
+  if (_blokSel[id] != null) {
+    delete _blokSel[id];
+  } else {
+    _blokSel[id] = Math.min(10, total); // default
+  }
+  renderBlokSources();
+}
+
+function setBlokSourceCount(id, val, total) {
+  let n = parseInt(val);
+  if (isNaN(n)) { _blokSel[id] = ''; updateBlokSummary(); return; }
+  n = Math.max(1, Math.min(n, total));
+  _blokSel[id] = n;
+  updateBlokSummary();
+}
+
+function updateBlokSummary() {
+  const el = document.getElementById('blok-summary');
+  if (!el) return;
+  const ids = Object.keys(_blokSel);
+  const totalQ = ids.reduce((s, id) => s + (parseInt(_blokSel[id]) || 0), 0);
+  if (!ids.length) {
+    el.innerHTML = `<div class="blok-sum-empty">Hali test tanlanmadi</div>`;
+    return;
+  }
+  el.innerHTML = `
+    <div class="blok-sum-box">
+      <div><b>${ids.length}</b> ta test tanlandi</div>
+      <div>Jami: <b>${totalQ}</b> ta savol blok testga kiradi</div>
+    </div>`;
+}
+
+async function createBlokTest() {
+  const title = document.getElementById('blok-title').value.trim();
+  const timeLimit = parseInt(document.getElementById('blok-time').value);
+  const shuffleQ = document.getElementById('blok-shuffle-q').value === 'true';
+  const shuffleA = document.getElementById('blok-shuffle-a').value === 'true';
+
+  if (!title) { toast('Blok test nomini kiriting!', 'error'); return; }
+  if (!timeLimit || timeLimit < 5) { toast('Vaqt limiti kamida 5 soniya', 'error'); return; }
+
+  const sources = Object.keys(_blokSel)
+    .map(id => ({ quizId: parseInt(id), count: parseInt(_blokSel[id]) || 0 }))
+    .filter(s => s.count > 0);
+
+  if (!sources.length) { toast('Kamida bitta testdan savol tanlang!', 'error'); return; }
+
+  const btn = document.getElementById('btn-create-blok');
+  btn.disabled = true;
+  btn.textContent = 'Yaratilmoqda...';
+  try {
+    const quiz = await req('POST', '/api/quizzes/blok', { title, timeLimit, shuffleQ, shuffleA, sources });
+    toast(`✅ "${quiz.title}" yaratildi (${quiz.questions?.length || 0} savol)`, 'success');
+    // Tozalash
+    _blokSel = {};
+    document.getElementById('blok-title').value = '';
+    document.getElementById('blok-search').value = '';
+    renderBlokSources();
+    showPage('dashboard');
+  } catch (e) {
+    toast(e.message, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '✅ Blok test yaratish';
+  }
 }
 
 // ── SEND TO GROUP ─────────────────────────────────────────────────────────────

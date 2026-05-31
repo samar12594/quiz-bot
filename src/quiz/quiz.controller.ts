@@ -35,6 +35,12 @@ export class QuizController {
     return this.quizService.create(body);
   }
 
+  @Post('quizzes/blok')
+  createBlok(@Headers('x-admin-secret') secret: string, @Body() body: any) {
+    checkAuth(secret);
+    return this.quizService.createBlok(body);
+  }
+
   @Put('quizzes/:id')
   update(
     @Headers('x-admin-secret') secret: string,
