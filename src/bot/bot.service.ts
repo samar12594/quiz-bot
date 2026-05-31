@@ -65,6 +65,17 @@ export class BotService implements OnModuleInit {
     } catch (e: any) {
       console.error('setMyCommands error:', e.message);
     }
+
+    // Bir martalik backfill: isBlok belgisidan oldin yaratilgan bot bloklari
+    // (🧩 / 🤖 bilan boshlanadi) fan guruhlashda ko'rinmasligi uchun belgilanadi.
+    try {
+      await this.prisma.quiz.updateMany({
+        where: { isBlok: false, OR: [{ title: { startsWith: '🧩' } }, { title: { startsWith: '🤖' } }] },
+        data: { isBlok: true },
+      });
+    } catch (e: any) {
+      console.error('blok backfill error:', e.message);
+    }
   }
 
   hasActiveQuiz(chatId: string) { return this.activeQuizzes.has(chatId); }

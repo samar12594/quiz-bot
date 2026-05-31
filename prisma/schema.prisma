@@ -15,6 +15,7 @@ model Quiz {
   shuffleQ    Boolean    @default(true)
   shuffleA    Boolean    @default(true)
   isActive    Boolean    @default(true)
+  isBlok      Boolean    @default(false)
   createdAt   DateTime   @default(now())
   questions   Question[]
   sessions    Session[]

@@ -56,7 +56,8 @@ export class QuizService {
   // Faol testlarni fan bo'yicha guruhlaydi. Har bir guruh — bir nechta
   // test bo'lagini (1-50, 51-100...) birlashtirgan yagona fan.
   async getSubjectGroups() {
-    const quizzes = await this.findActive();
+    // Blok testlarni chiqarib tashlaymiz — ular manba fan bo'la olmaydi
+    const quizzes = (await this.findActive()).filter((q: any) => !q.isBlok);
     const map = new Map<string, { key: string; label: string; quizIds: number[]; total: number; parts: number }>();
     for (const q of quizzes as any[]) {
       const label = QuizService.subjectOf(q.title);
@@ -94,6 +95,7 @@ export class QuizService {
         shuffleQ: data.shuffleQ ?? true,
         shuffleA: data.shuffleA ?? true,
         isActive: data.isActive ?? true,
+        isBlok: true, // blok test — fan guruhlashda manba sifatida ko'rinmaydi
       },
     });
 
