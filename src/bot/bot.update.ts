@@ -144,17 +144,51 @@ export class BotUpdate {
     await this.showQuizList(ctx);
   }
 
-  private async showQuizList(ctx: any) {
+  private static QLIST_PAGE = 8; // /quiz ro'yxatidagi testlar soni (sahifada)
+
+  private async showQuizList(ctx: any, page = 0, edit = false) {
     const quizzes = await this.quizService.findActive();
     if (!quizzes.length) {
       await ctx.reply("😕 Faol testlar yo'q. Admin paneldan test yarating.");
       return;
     }
-    const kb = quizzes.map(q => [{
-      text: `📚 ${q.title} (${(q as any)._count.questions} savol)`,
+    const { text, keyboard } = this.quizListView(quizzes, page);
+    if (edit) {
+      await ctx.editMessageText(text, { parse_mode: 'Markdown', reply_markup: { inline_keyboard: keyboard } }).catch(() => {});
+    } else {
+      await ctx.reply(text, { parse_mode: 'Markdown', reply_markup: { inline_keyboard: keyboard } });
+    }
+  }
+
+  private quizListView(quizzes: any[], page: number) {
+    const PAGE = BotUpdate.QLIST_PAGE;
+    const pages = Math.max(1, Math.ceil(quizzes.length / PAGE));
+    const p = Math.min(Math.max(0, page), pages - 1);
+    const slice = quizzes.slice(p * PAGE, p * PAGE + PAGE);
+
+    const keyboard: any[] = slice.map(q => [{
+      text: `📚 ${q.title} (${q._count.questions} savol)`,
       callback_data: `sq_${q.id}`,
     }]);
-    await ctx.reply('📋 *Test tanlang:*', { parse_mode: 'Markdown', reply_markup: { inline_keyboard: kb } });
+
+    // Pagination (1 2 3) — 5 tadan qatorga bo'lib
+    if (pages > 1) {
+      let nav: any[] = [];
+      for (let i = 0; i < pages; i++) {
+        nav.push({ text: i === p ? `·${i + 1}·` : `${i + 1}`, callback_data: `qlist_pg_${i}` });
+        if (nav.length === 5) { keyboard.push(nav); nav = []; }
+      }
+      if (nav.length) keyboard.push(nav);
+    }
+
+    const text = `📋 *Test tanlang:*` + (pages > 1 ? `\nSahifa: *${p + 1}/${pages}*` : '');
+    return { text, keyboard };
+  }
+
+  @Action(/^qlist_pg_(\d+)$/)
+  async onQuizListPage(@Ctx() ctx: any) {
+    await ctx.answerCbQuery().catch(() => {});
+    await this.showQuizList(ctx, parseInt(ctx.match[1]), true);
   }
 
   private async doStartQuiz(ctx: any, chatId: string, quizId: number) {
