@@ -15,9 +15,14 @@ if [ -f "$ERR_LOG" ] && [ -s "$ERR_LOG" ]; then
 fi
 pm2 flush || true
 
-echo "==> 2. Eski build (dist) o'chirib, qayta yig'ish"
-rm -rf dist
+echo "==> 2. Eski build (dist + tsbuildinfo) o'chirib, qayta yig'ish"
+rm -rf dist tsconfig.tsbuildinfo
 npm run build
+# Build to'g'ri chiqqanini tasdiqlaymiz — dist/main.js bo'lmasa to'xtatamiz
+if [ ! -f dist/main.js ]; then
+  echo "❌ XATO: dist/main.js yaratilmadi — build muvaffaqiyatsiz. To'xtatildi."
+  exit 1
+fi
 
 echo "==> 3. npm keshini tozalash"
 npm cache clean --force || true
