@@ -25,6 +25,14 @@ export class QuizController {
     return this.quizService.findAll();
   }
 
+  // Telegram cheklovidan oshgan (poll yuborilmaydigan) savollarni topadi.
+  // Hammasi: /api/validate   bitta test: /api/validate?quizId=12
+  @Get('validate')
+  validate(@Query('quizId') quizId?: string) {
+    const id = quizId ? parseInt(quizId) : undefined;
+    return this.quizService.findInvalidQuestions(id && !isNaN(id) ? id : undefined);
+  }
+
   @Get('quizzes/active')
   findActive() {
     return this.quizService.findActive();

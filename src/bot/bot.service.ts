@@ -253,9 +253,17 @@ export class BotService implements OnModuleInit {
     if (active.nextTimer) clearTimeout(active.nextTimer);
 
     const q = active.questions[active.currentIndex];
-    const options = q.options as string[];
+    const rawOptions = q.options as string[];
     const timeLimit = active.timeLimit;
-    const questionText = `[${active.currentIndex + 1}/${active.questions.length}] ${q.text}`;
+    const prefix = `[${active.currentIndex + 1}/${active.questions.length}] `;
+
+    // Telegram quiz poll cheklovlari: savol <=300, variant <=100, izoh <=200 belgi.
+    // Limitdan oshsa Telegram butun pollni rad etadi -> savol "yo'qolib" qoladi.
+    const clip = (s: string, max: number) =>
+      typeof s === 'string' && s.length > max ? s.slice(0, max - 1) + '…' : (s ?? '');
+    const questionText = clip(prefix + (q.text ?? ''), 300);
+    const options = rawOptions.map((o) => clip(String(o), 100));
+    const explanation = q.explain ? clip(String(q.explain), 200) : undefined;
 
     try {
       const pollMsg: any = await (this.bot.telegram as any).sendPoll(
@@ -265,7 +273,7 @@ export class BotService implements OnModuleInit {
         {
           type: 'quiz',
           correct_option_id: q.correct,
-          explanation: q.explain || undefined,
+          explanation,
           is_anonymous: false,
           open_period: timeLimit,
         },
@@ -277,7 +285,20 @@ export class BotService implements OnModuleInit {
         this.pollMap.set(pollId, { chatId, questionId: q.id, sessionId: active.sessionId, correctIndex: q.correct });
       }
     } catch (e: any) {
-      console.error('sendPoll error:', e.message);
+      // Poll baribir yuborilmasa (masalan variant juda uzun bo'lsa), savol
+      // yo'qolib qolmasligi uchun oddiy matn xabari yuboramiz va davom etamiz.
+      console.error(`sendPoll error (qId=${q.id}, idx=${active.currentIndex + 1}):`, e.message);
+      try {
+        const letters = ['A', 'B', 'C', 'D', 'E', 'F'];
+        const body =
+          `${questionText}\n\n` +
+          options.map((o, i) => `${letters[i] || i + 1}) ${o}`).join('\n') +
+          `\n\n✅ To'g'ri javob: ${letters[q.correct] || q.correct + 1}` +
+          (explanation ? `\n💡 ${explanation}` : '');
+        await this.bot.telegram.sendMessage(chatId, body);
+      } catch (e2: any) {
+        console.error('fallback sendMessage error:', e2.message);
+      }
     }
 
     this.events.emit(chatId, 'question', {

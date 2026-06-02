@@ -43,6 +43,43 @@ export class QuizService {
     return this.prisma.quiz.update({ where: { id }, data });
   }
 
+  // Telegram quiz poll cheklovlaridan oshib ketgan savollarni topadi.
+  // Bunday savollarni Telegram rad etadi -> test "qotib qoladi"/savol yo'qoladi.
+  // Limitlar: savol matni 300, har variant 100, izoh 200 belgi; variant 2..10 ta.
+  async findInvalidQuestions(quizId?: number) {
+    const questions = await this.prisma.question.findMany({
+      where: quizId ? { quizId } : undefined,
+      include: { quiz: { select: { id: true, title: true } } },
+      orderBy: { id: 'asc' },
+    });
+    const problems: any[] = [];
+    for (const q of questions) {
+      const issues: string[] = [];
+      const text = q.text || '';
+      const opts = Array.isArray(q.options) ? (q.options as any[]).map(String) : [];
+      if (text.length > 300) issues.push(`savol matni ${text.length}>300 belgi`);
+      opts.forEach((o, i) => {
+        if (o.length > 100) issues.push(`variant ${i + 1}: ${o.length}>100 belgi`);
+        if (o.trim() === '') issues.push(`variant ${i + 1}: bo'sh`);
+      });
+      if (opts.length < 2) issues.push(`variantlar soni ${opts.length}<2`);
+      if (opts.length > 10) issues.push(`variantlar soni ${opts.length}>10`);
+      if (q.explain && q.explain.length > 200) issues.push(`izoh ${q.explain.length}>200 belgi`);
+      if (q.correct < 0 || q.correct >= opts.length) issues.push(`to'g'ri javob indeksi (${q.correct}) variantlar oralig'idan tashqarida`);
+      if (issues.length) {
+        problems.push({
+          questionId: q.id,
+          quizId: q.quiz?.id,
+          quizTitle: q.quiz?.title,
+          order: q.order,
+          textPreview: text.slice(0, 80),
+          issues,
+        });
+      }
+    }
+    return { total: questions.length, problemCount: problems.length, problems };
+  }
+
   // Test nomidan "fan" (subject) nomini ajratib oladi — boshidagi raqamli
   // diapazon ("151 - 200", "1-38") yoki "N-variant" qismini olib tashlaydi.
   // Masalan: "1-38 Bolalar adabiyoti" → "Bolalar adabiyoti".
