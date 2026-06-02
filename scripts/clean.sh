@@ -4,7 +4,15 @@
 set -e
 cd "$(dirname "$0")/.."
 
-echo "==> 1. PM2 loglarni tozalash (disk to'lib qolmasligi uchun)"
+echo "==> 1. PM2 loglarni saqlab, keyin tozalash (disk to'lib qolmasligi uchun)"
+# Tozalashdan OLDIN xato logining oxirini saqlaymiz — keyin sabab kerak bo'lsa qoladi.
+mkdir -p logs-archive
+ERR_LOG="$HOME/.pm2/logs/quiz-bot-error.log"
+if [ -f "$ERR_LOG" ] && [ -s "$ERR_LOG" ]; then
+  STAMP=$(date +%Y%m%d-%H%M%S)
+  tail -n 200 "$ERR_LOG" > "logs-archive/error-$STAMP.log"
+  echo "    Eski xato logi saqlandi: logs-archive/error-$STAMP.log"
+fi
 pm2 flush || true
 
 echo "==> 2. Eski build (dist) o'chirib, qayta yig'ish"
