@@ -110,6 +110,7 @@ function showPage(name) {
   if (name === 'blok') loadBlokSources();
   if (name === 'leaderboard') loadLeaderboard();
   if (name === 'live') startLive();
+  if (name === 'validate') loadValidate();
   // Sidebar'dan "Test yaratish" bosilganda — toza forma
   if (name === 'create-quiz' && !window._openingExisting) newQuizForm();
 }
@@ -424,8 +425,13 @@ async function addQuestion() {
   } catch (e) { toast(e.message, 'error'); }
 }
 
+let _previewQuestions = [];     // joriy testning savollari (tahrirlash uchun kesh)
+let _previewQuizId = null;
+
 async function loadQuestionsPreview(quizId) {
   const questions = await req('GET', `/api/quizzes/${quizId}/questions`);
+  _previewQuestions = questions;
+  _previewQuizId = quizId;
   const el = document.getElementById('questions-preview');
   if (!questions.length) { el.innerHTML = '<p style="color:var(--text-muted);text-align:center;padding:20px">Hali savollar yo\'q</p>'; return; }
 
@@ -441,10 +447,64 @@ async function loadQuestionsPreview(quizId) {
           </div>
           ${q.explain ? `<div style="font-size:12px;color:var(--primary);margin-top:4px">💡 ${esc(q.explain)}</div>` : ''}
         </div>
-        <button onclick="deleteQuestion(${q.id}, ${quizId})" class="btn-danger" style="font-size:12px;padding:5px 10px;flex-shrink:0">🗑️</button>
+        <div style="display:flex;gap:6px;flex-shrink:0">
+          <button onclick="editPreviewQuestion(${q.id})" class="btn-secondary" style="font-size:12px;padding:5px 10px">✏️</button>
+          <button onclick="deleteQuestion(${q.id}, ${quizId})" class="btn-danger" style="font-size:12px;padding:5px 10px">🗑️</button>
+        </div>
       </div>
     `;
   }).join('');
+}
+
+function editPreviewQuestion(id) {
+  const q = _previewQuestions.find(x => x.id === id);
+  if (!q) return;
+  openQuestionEditor(q, () => loadQuestionsPreview(_previewQuizId));
+}
+
+// ── Savolni tahrirlash modal'i (create-quiz va "Muammoli savollar" uchun umumiy)
+function openQuestionEditor(q, onSaved) {
+  const labels = ['A', 'B', 'C', 'D'];
+  const opts = q.options || [];
+  document.getElementById('modal-icon').textContent = '✏️';
+  document.getElementById('modal-title').textContent = 'Savolni tahrirlash';
+  document.getElementById('modal-body').innerHTML = `
+    <div class="form-group" style="text-align:left">
+      <label>Savol matni</label>
+      <textarea id="eq-text" rows="3">${esc(q.text || '')}</textarea>
+    </div>
+    ${[0, 1, 2, 3].map(i => `
+      <div class="form-group" style="text-align:left">
+        <label>${labels[i]} variant</label>
+        <input type="text" id="eq-opt-${i}" value="${esc(opts[i] || '')}" />
+      </div>`).join('')}
+    <div class="form-group" style="text-align:left">
+      <label>To'g'ri javob</label>
+      <select id="eq-correct">
+        ${labels.map((l, i) => `<option value="${i}" ${i === q.correct ? 'selected' : ''}>${l}</option>`).join('')}
+      </select>
+    </div>
+    <div class="form-group" style="text-align:left">
+      <label>Izoh (ixtiyoriy)</label>
+      <input type="text" id="eq-explain" value="${esc(q.explain || '')}" />
+    </div>`;
+  const btn = document.getElementById('modal-confirm');
+  btn.textContent = '💾 Saqlash';
+  btn.onclick = async () => {
+    const text = document.getElementById('eq-text').value.trim();
+    const options = [0, 1, 2, 3].map(i => document.getElementById(`eq-opt-${i}`).value.trim());
+    const correct = parseInt(document.getElementById('eq-correct').value);
+    const explain = document.getElementById('eq-explain').value.trim();
+    if (!text || options.some(o => !o)) { toast('Barcha maydonlarni to\'ldiring!', 'error'); return; }
+    try {
+      await req('PUT', `/api/questions/${q.id}`, { text, options, correct, explain: explain || null });
+      closeModal();
+      btn.textContent = 'Ha';
+      toast('Savol saqlandi!', 'success');
+      if (onSaved) onSaved();
+    } catch (e) { toast(e.message, 'error'); }
+  };
+  document.getElementById('modal').classList.remove('hidden');
 }
 
 async function deleteQuestion(id, quizId) {
@@ -900,6 +960,48 @@ function liveElapsed(startTime) {
   const sec = Math.max(0, Math.floor((Date.now() - new Date(startTime).getTime()) / 1000));
   const m = Math.floor(sec / 60), s = sec % 60;
   return m > 0 ? `${m}m ${s}s` : `${s}s`;
+}
+
+// ── MUAMMOLI SAVOLLAR (Telegram limitidan oshgan) ───────────────────────────
+let _validateProblems = [];
+
+async function loadValidate() {
+  const el = document.getElementById('validate-list');
+  const label = document.getElementById('validate-count-label');
+  if (!el) return;
+  el.innerHTML = '<p style="color:var(--text-muted);text-align:center;padding:20px">Tekshirilmoqda...</p>';
+  try {
+    const res = await req('GET', '/api/validate');
+    _validateProblems = res.problems || [];
+    if (label) label.textContent = `${res.problemCount} / ${res.total} savol`;
+    if (!_validateProblems.length) {
+      el.innerHTML = '<p style="color:var(--success,#16a34a);text-align:center;padding:40px">✅ Muammoli savol topilmadi — hammasi joyida!</p>';
+      return;
+    }
+    el.innerHTML = _validateProblems.map(p => `
+      <div class="question-item">
+        <div class="q-info">
+          <h4>${esc(p.quizTitle || 'Test')} <span style="color:var(--text-muted);font-weight:400">· #${p.questionId}</span></h4>
+          <div style="font-size:13px;margin:4px 0">${esc(p.textPreview)}${(p.text || '').length > 80 ? '…' : ''}</div>
+          <div class="validate-issues">
+            ${p.issues.map(iss => `<span class="validate-issue">⚠️ ${esc(iss)}</span>`).join(' ')}
+          </div>
+        </div>
+        <button onclick="editValidateQuestion(${p.questionId})" class="btn-primary" style="font-size:12px;padding:5px 10px;flex-shrink:0">✏️ Tahrirlash</button>
+      </div>
+    `).join('');
+  } catch (e) {
+    el.innerHTML = `<p style="color:var(--danger,#e53);text-align:center;padding:20px">${esc(e.message)}</p>`;
+  }
+}
+
+function editValidateQuestion(id) {
+  const p = _validateProblems.find(x => x.questionId === id);
+  if (!p) return;
+  openQuestionEditor(
+    { id: p.questionId, text: p.text, options: p.options, correct: p.correct, explain: p.explain },
+    () => loadValidate(),
+  );
 }
 
 // ── BLOK TEST (fan bo'yicha) ────────────────────────────────────────────────

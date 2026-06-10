@@ -129,6 +129,16 @@ export class QuizController {
     return this.quizService.addQuestion(id, body);
   }
 
+  @Put('questions/:id')
+  updateQuestion(
+    @Headers('x-admin-secret') secret: string,
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: any,
+  ) {
+    checkAuth(secret);
+    return this.quizService.updateQuestion(id, body);
+  }
+
   @Delete('questions/:id')
   removeQuestion(
     @Headers('x-admin-secret') secret: string,

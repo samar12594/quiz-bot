@@ -17,6 +17,9 @@ export class BotUpdate {
     private quizService: QuizService,
   ) {}
 
+  // Qidiruv rejimi — "🔎 Qidirish" bosilgan chatId'lar (keyingi matn = qidiruv so'rovi)
+  private searchMode = new Set<string>();
+
   @Start()
   async onStart(@Ctx() ctx: Context) {
     const appUrl = process.env.APP_URL || `http://localhost:${process.env.PORT || 3000}`;
@@ -182,6 +185,8 @@ export class BotUpdate {
         if (nav.length === 5) { keyboard.push(nav); nav = []; }
       }
       if (nav.length) keyboard.push(nav);
+      // Ko'p test bo'lsa — qidiruv tugmasi
+      keyboard.push([{ text: '🔎 Qidirish', callback_data: 'quiz_search' }]);
     }
 
     const text = `📋 *Test tanlang:*` + (pages > 1 ? `\nSahifa: *${p + 1}/${pages}*` : '');
@@ -192,6 +197,13 @@ export class BotUpdate {
   async onQuizListPage(@Ctx() ctx: any) {
     await ctx.answerCbQuery().catch(() => {});
     await this.showQuizList(ctx, parseInt(ctx.match[1]), true);
+  }
+
+  @Action('quiz_search')
+  async onQuizSearch(@Ctx() ctx: any) {
+    await ctx.answerCbQuery().catch(() => {});
+    this.searchMode.add(String(ctx.chat.id));
+    await ctx.reply('🔎 Qidirilayotgan test nomini yozing:');
   }
 
   private async doStartQuiz(ctx: any, chatId: string, quizId: number) {
@@ -414,6 +426,31 @@ export class BotUpdate {
   @On('text')
   async onBlokTextInput(@Ctx() ctx: any) {
     const chatId = String(ctx.chat.id);
+
+    // Qidiruv rejimi (bir martalik) — keyingi matn test nomini qidiradi
+    if (this.searchMode.has(chatId)) {
+      this.searchMode.delete(chatId);
+      const query = (ctx.message?.text || '').trim().toLowerCase();
+      if (!query) { await ctx.reply('🔎 Qidiruv so\'rovi bo\'sh.'); return; }
+      const quizzes = await this.quizService.findActive();
+      const found = quizzes.filter(q => (q.title || '').toLowerCase().includes(query));
+      if (!found.length) {
+        await ctx.reply(`😕 "${query}" bo'yicha test topilmadi.`);
+        return;
+      }
+      const shown = found.slice(0, 12);
+      const keyboard = shown.map(q => [{
+        text: `📚 ${q.title} (${q._count.questions} savol)`,
+        callback_data: `sq_${q.id}`,
+      }]);
+      const extra = found.length > shown.length ? `\n\n_Yana ${found.length - shown.length} ta topildi — nomini aniqroq yozing._` : '';
+      await ctx.reply(`🔎 *${found.length} ta natija:*${extra}`, {
+        parse_mode: 'Markdown',
+        reply_markup: { inline_keyboard: keyboard },
+      });
+      return;
+    }
+
     const b = this.botService.getBlokBuilder(chatId);
     if (!b || b.step === 'select') return; // jarayon yo'q yoki tanlash bosqichi — e'tibor bermaymiz
 

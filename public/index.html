@@ -29,6 +29,7 @@
         <li><a href="#" onclick="showPage('stats')" id="nav-stats">📈 Natijalar</a></li>
         <li><a href="#" onclick="showPage('leaderboard')" id="nav-leaderboard">🏆 Reyting</a></li>
         <li><a href="#" onclick="showPage('live')" id="nav-live">👀 Jonli</a></li>
+        <li><a href="#" onclick="showPage('validate')" id="nav-validate">🔍 Muammoli savollar</a></li>
       </ul>
       <div class="sidebar-footer">
         <button onclick="toggleTheme()" class="theme-toggle" id="theme-toggle-btn" title="Mavzu (kunduz/tun)">
@@ -303,6 +304,20 @@
           Hozir ishlab turgan testlar — har 4 soniyada yangilanadi. <span id="live-updated"></span>
         </p>
         <div id="live-list" class="quiz-grid"></div>
+      </div>
+
+      <!-- MUAMMOLI SAVOLLAR -->
+      <div id="page-validate" class="page hidden">
+        <h2>
+          🔍 Muammoli savollar
+          <span class="filter-result-count" id="validate-count-label"></span>
+        </h2>
+        <p style="color:var(--text-muted);margin:-8px 0 16px">
+          Telegram cheklovidan oshgan savollar (savol &gt;300, variant &gt;100, izoh &gt;200 belgi yoki bo'sh variant).
+          Bunday savollar botda "yo'qolib" qoladi — tahrirlab tuzating.
+          <button onclick="loadValidate()" class="btn-secondary" style="font-size:12px;padding:4px 10px;margin-left:8px">🔄 Yangilash</button>
+        </p>
+        <div id="validate-list"></div>
       </div>
     </main>
   </div>

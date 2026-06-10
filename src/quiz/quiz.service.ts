@@ -73,6 +73,11 @@ export class QuizService {
           quizTitle: q.quiz?.title,
           order: q.order,
           textPreview: text.slice(0, 80),
+          // tahrirlash modal'i uchun to'liq maydonlar
+          text,
+          options: opts,
+          correct: q.correct,
+          explain: q.explain || '',
           issues,
         });
       }
@@ -277,6 +282,20 @@ export class QuizService {
       where: { quizId },
       orderBy: { order: 'asc' },
     });
+  }
+
+  async updateQuestion(id: number, q: {
+    text?: string;
+    options?: string[];
+    correct?: number;
+    explain?: string | null;
+  }) {
+    const data: any = {};
+    if (q.text !== undefined) data.text = q.text;
+    if (q.options !== undefined) data.options = q.options;
+    if (q.correct !== undefined) data.correct = q.correct;
+    if (q.explain !== undefined) data.explain = q.explain || null;
+    return this.prisma.question.update({ where: { id }, data });
   }
 
   async removeQuestion(id: number) {
