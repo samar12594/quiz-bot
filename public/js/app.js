@@ -97,6 +97,9 @@ document.addEventListener('click', e => {
 
 // ── NAV ───────────────────────────────────────────────────────────────────────
 function showPage(name) {
+  // Boshqa sahifaga o'tilganda jonli yangilanishni to'xtatamiz (interval to'planmasin)
+  if (window._liveTimer) { clearInterval(window._liveTimer); window._liveTimer = null; }
+
   document.querySelectorAll('.page').forEach(p => p.classList.add('hidden'));
   document.querySelectorAll('.sidebar a').forEach(a => a.classList.remove('active'));
   document.getElementById(`page-${name}`).classList.remove('hidden');
@@ -106,6 +109,7 @@ function showPage(name) {
   if (name === 'stats') loadStatsQuizList();
   if (name === 'blok') loadBlokSources();
   if (name === 'leaderboard') loadLeaderboard();
+  if (name === 'live') startLive();
   // Sidebar'dan "Test yaratish" bosilganda — toza forma
   if (name === 'create-quiz' && !window._openingExisting) newQuizForm();
 }
@@ -839,6 +843,63 @@ async function loadLeaderboard() {
         `).join('')}
       </ul>`;
   } catch (e) { toast(e.message, 'error'); }
+}
+
+// ── JONLI SESSIYALAR ────────────────────────────────────────────────────────
+function startLive() {
+  loadLiveSessions();
+  window._liveTimer = setInterval(loadLiveSessions, 4000);
+}
+
+async function loadLiveSessions() {
+  const el = document.getElementById('live-list');
+  if (!el) return;
+  try {
+    const sessions = await req('GET', '/api/sessions/live');
+    renderLiveSessions(sessions);
+  } catch (e) {
+    el.innerHTML = `<p style="color:var(--danger,#e53);text-align:center;padding:20px">${esc(e.message)}</p>`;
+  }
+}
+
+function renderLiveSessions(sessions) {
+  const el = document.getElementById('live-list');
+  const label = document.getElementById('live-count-label');
+  const upd = document.getElementById('live-updated');
+  if (label) label.textContent = sessions.length ? `${sessions.length} ta faol` : '';
+  if (upd) upd.textContent = 'Yangilandi: ' + new Date().toLocaleTimeString('uz');
+  if (!el) return;
+  if (!sessions.length) {
+    el.innerHTML = '<p style="color:var(--text-muted);text-align:center;padding:40px">🟢 Hozir faol sessiya yo\'q</p>';
+    return;
+  }
+  const kindBadge = { bot: '👤 Shaxsiy', group: '👥 Guruh', web: '🌐 Web' };
+  el.innerHTML = sessions.map(s => {
+    const pct = s.total ? Math.round((s.current / s.total) * 100) : 0;
+    return `
+    <div class="quiz-card live-card">
+      <div class="live-head">
+        <span class="live-kind">${kindBadge[s.kind] || esc(s.kind)}</span>
+        ${s.isBlok ? '<span class="live-kind blok">🧩 Blok</span>' : ''}
+      </div>
+      <h3 class="live-title">${esc(s.quizTitle)}</h3>
+      <div class="live-progress">
+        <div class="live-bar"><div class="live-bar-fill" style="width:${pct}%"></div></div>
+        <span class="live-prog-text">Savol ${s.current ?? '?'} / ${s.total ?? '?'}</span>
+      </div>
+      <div class="live-meta">
+        <span>👥 ${s.participants} ishtirokchi</span>
+        <span>✍️ ${s.totalAnswers} javob</span>
+        <span>⏱ ${liveElapsed(s.startTime)}</span>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function liveElapsed(startTime) {
+  const sec = Math.max(0, Math.floor((Date.now() - new Date(startTime).getTime()) / 1000));
+  const m = Math.floor(sec / 60), s = sec % 60;
+  return m > 0 ? `${m}m ${s}s` : `${s}s`;
 }
 
 // ── BLOK TEST (fan bo'yicha) ────────────────────────────────────────────────

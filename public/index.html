@@ -28,6 +28,7 @@
         <li><a href="#" onclick="showPage('import')" id="nav-import">📂 CSV Import</a></li>
         <li><a href="#" onclick="showPage('stats')" id="nav-stats">📈 Natijalar</a></li>
         <li><a href="#" onclick="showPage('leaderboard')" id="nav-leaderboard">🏆 Reyting</a></li>
+        <li><a href="#" onclick="showPage('live')" id="nav-live">👀 Jonli</a></li>
       </ul>
       <div class="sidebar-footer">
         <button onclick="toggleTheme()" class="theme-toggle" id="theme-toggle-btn" title="Mavzu (kunduz/tun)">
@@ -290,6 +291,18 @@
           Barcha testlar bo'yicha eng ko'p to'g'ri javob bergan foydalanuvchilar.
         </p>
         <div class="card" id="leaderboard-content"></div>
+      </div>
+
+      <!-- JONLI SESSIYALAR -->
+      <div id="page-live" class="page hidden">
+        <h2>
+          👀 Jonli sessiyalar
+          <span class="filter-result-count" id="live-count-label"></span>
+        </h2>
+        <p style="color:var(--text-muted);margin:-8px 0 16px">
+          Hozir ishlab turgan testlar — har 4 soniyada yangilanadi. <span id="live-updated"></span>
+        </p>
+        <div id="live-list" class="quiz-grid"></div>
       </div>
     </main>
   </div>

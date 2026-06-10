@@ -1,4 +1,4 @@
-import { Controller, Post, Get, Body, Param, Headers } from '@nestjs/common';
+import { Controller, Post, Get, Body, Param, Headers, UnauthorizedException } from '@nestjs/common';
 import { SessionService } from './session.service';
 
 @Controller('api/sessions')
@@ -8,6 +8,13 @@ export class SessionController {
   @Get('active')
   getActive() {
     return this.sessionService.getActiveSessions();
+  }
+
+  // Admin "Jonli sessiyalar" — hozir ishlab turgan testlar (real vaqtda)
+  @Get('live')
+  getLive(@Headers('x-admin-secret') secret: string) {
+    if (secret !== process.env.ADMIN_SECRET) throw new UnauthorizedException('Ruxsat yo\'q');
+    return this.sessionService.getLiveSessions();
   }
 
   @Post('solo')

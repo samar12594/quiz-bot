@@ -32,6 +32,64 @@ export class SessionService {
     });
   }
 
+  // Hozir xotirada ishlab turgan web (solo) sessiyalari.
+  private getLiveSoloSessions() {
+    const out: any[] = [];
+    for (const [chatId, s] of this.soloSessions.entries()) {
+      if (!s.started) continue;
+      out.push({
+        sessionId: s.sessionId,
+        chatId,
+        quizTitle: undefined,      // pastda DB'dan to'ldiriladi
+        current: s.currentIndex + 1,
+        total: s.questions.length,
+        startTime: s.startTime,
+        isBlok: false,
+        kind: 'web',
+      });
+    }
+    return out;
+  }
+
+  // Admin "Jonli sessiyalar" sahifasi uchun — bot/guruh + web sessiyalarini
+  // birlashtirib, har biriga ishtirokchilar soni va javoblar sonini qo'shadi.
+  async getLiveSessions() {
+    const all = [...this.botService.getLiveBotSessions(), ...this.getLiveSoloSessions()];
+    if (!all.length) return [];
+
+    const result: any[] = [];
+    for (const s of all) {
+      const answers = await this.prisma.answer.findMany({
+        where: { sessionId: s.sessionId },
+        select: { userId: true, isCorrect: true },
+      });
+      const users = new Set(answers.map(a => a.userId));
+
+      let quizTitle = s.quizTitle;
+      if (!quizTitle) {
+        const sess = await this.prisma.session.findUnique({
+          where: { id: s.sessionId },
+          include: { quiz: { select: { title: true } } },
+        });
+        quizTitle = sess?.quiz?.title || 'Test';
+      }
+
+      result.push({
+        sessionId: s.sessionId,
+        quizTitle,
+        kind: s.kind,            // 'bot' | 'group' | 'web'
+        isBlok: s.isBlok || false,
+        current: s.current,
+        total: s.total,
+        participants: users.size,
+        totalAnswers: answers.length,
+        startTime: s.startTime,
+      });
+    }
+    result.sort((a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime());
+    return result;
+  }
+
   async startSolo(quizId: number, userId: string, username: string) {
     const quiz = await this.prisma.quiz.findUnique({
       where: { id: quizId },

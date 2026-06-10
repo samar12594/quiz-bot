@@ -83,6 +83,24 @@ export class BotService implements OnModuleInit {
   hasActiveQuiz(chatId: string) { return this.activeQuizzes.has(chatId); }
   getActiveQuiz(chatId: string) { return this.activeQuizzes.get(chatId); }
 
+  // Hozir xotirada ishlab turgan bot/guruh sessiyalari — admin "Jonli" sahifasi uchun.
+  getLiveBotSessions() {
+    const out: any[] = [];
+    for (const [chatId, a] of this.activeQuizzes.entries()) {
+      out.push({
+        sessionId: a.sessionId,
+        chatId,
+        quizTitle: a.quizTitle,
+        current: a.currentIndex + 1,
+        total: a.questions.length,
+        startTime: a.startTime,
+        isBlok: !!a.isBlok,
+        kind: chatId.startsWith('-') ? 'group' : 'bot',
+      });
+    }
+    return out;
+  }
+
   // ─── Blok test quruvchi ───────────────────────────────────────────────
 
   async startBlokBuilder(chatId: string): Promise<BlokBuilder> {

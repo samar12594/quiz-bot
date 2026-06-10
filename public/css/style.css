@@ -648,3 +648,22 @@ details.stats-session[open] summary { margin-bottom: 12px; }
 .qdiff-fill.qd-hard { background: var(--danger); }
 .qdiff-pct { width: 92px; text-align: right; font-size: 12px; font-weight: 700; color: var(--text); flex-shrink: 0; }
 .qdiff-pct span { font-weight: 400; color: var(--text-muted); }
+
+/* ── Jonli sessiyalar ─────────────────────────────────────────── */
+.live-card { position: relative; border-left: 3px solid var(--success); }
+.live-head { display: flex; gap: 6px; margin-bottom: 8px; }
+.live-kind {
+  font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 999px;
+  background: rgba(99,102,241,0.15); color: var(--primary);
+}
+.live-kind.blok { background: rgba(245,158,11,0.15); color: #f59e0b; }
+.live-title { font-size: 15px; margin: 0 0 12px; line-height: 1.3; }
+.live-progress { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.live-bar { flex: 1; height: 8px; border-radius: 6px; background: var(--border); overflow: hidden; }
+.live-bar-fill {
+  height: 100%; border-radius: 6px; background: var(--primary);
+  transition: width 0.5s ease;
+}
+.live-prog-text { font-size: 12px; font-weight: 700; color: var(--text); white-space: nowrap; }
+.live-meta { display: flex; flex-wrap: wrap; gap: 12px; font-size: 12px; color: var(--text-muted); }
+.live-meta span { white-space: nowrap; }
